@@ -2,17 +2,18 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@uniswap/v4-core/contracts/interfaces/IUniswapV4Pool.sol";
+import "@uniswap/v4-core/src/types/PoolId.sol";
+
 
 contract PriceBasedAccessControl is Ownable {
-    IUniswapV4Pool public pool;
+    PoolId public poolId;
     uint256 public tolerance; // Tolerance in basis points (1 basis point = 0.01%)
 
     event ToleranceUpdated(uint256 newTolerance);
-    event PoolUpdated(address indexed newPool);
+    event PoolUpdated(PoolId indexed newPool);
 
-    constructor(address _pool, uint256 _tolerance) {
-        pool = IUniswapV4Pool(_pool);
+    constructor(PoolId _poolId, uint256 _tolerance, address initalOwner) Ownable(initalOwner) {
+        poolId = _poolId;
         tolerance = _tolerance;
     }
 
@@ -21,10 +22,11 @@ contract PriceBasedAccessControl is Ownable {
         emit ToleranceUpdated(_tolerance);
     }
 
-    function updatePool(address _pool) external onlyOwner {
-        pool = IUniswapV4Pool(_pool);
-        emit PoolUpdated(_pool);
+    function updatePool(PoolId _poolId) external onlyOwner {
+        poolId = _poolId;
+        emit PoolUpdated(_poolId);
     }
+    /* What is this fonction supposed to do? Uniswap v4 pools are not supposed to be balanced since all Lps have different ranges
 
     function isBalanced() public view returns (bool) {
         (uint112 reserve0, uint112 reserve1,) = pool.getReserves();
@@ -34,8 +36,9 @@ contract PriceBasedAccessControl is Ownable {
 
         return deltaPercentage <= tolerance;
     }
+    */
 
     function canPerformAction() external view returns (bool) {
-        return isBalanced();
+        //return isBalanced();
     }
 }

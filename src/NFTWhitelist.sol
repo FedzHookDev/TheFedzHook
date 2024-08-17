@@ -15,7 +15,7 @@ contract NFTWhitelist is Ownable {
     event RemovedFromWhitelist(address indexed account);
     event NFTContractUpdated(address indexed newNFTContract);
 
-    constructor(address _nftContract) {
+    constructor(address _nftContract, address initalOwner) Ownable(initalOwner) {
         nftContract = IERC721(_nftContract);
     }
 

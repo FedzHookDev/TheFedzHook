@@ -4,11 +4,9 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 contract NFTAccessScheduler is Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
-    using SafeMath for uint256;
 
     IERC721 public nftContract;
     uint256 public accessInterval;
@@ -25,10 +23,10 @@ contract NFTAccessScheduler is Ownable {
     event AccessIntervalUpdated(uint256 newInterval);
     event RoundEnded(address[] newRoundOrder);
 
-    constructor(address _nftContract, uint256 _accessInterval) {
+    constructor(address _nftContract, uint256 _accessInterval, address initalOwner) Ownable(initalOwner) {
         nftContract = IERC721(_nftContract);
         accessInterval = _accessInterval;
-        roundEndTime = block.timestamp.add(accessInterval);
+        roundEndTime = block.timestamp + (accessInterval);
         currentIndex = 0;
     }
 
@@ -54,7 +52,7 @@ contract NFTAccessScheduler is Ownable {
 
     function updateAccessInterval(uint256 _accessInterval) external onlyOwner {
         accessInterval = _accessInterval;
-        roundEndTime = block.timestamp.add(accessInterval);
+        roundEndTime = block.timestamp + (accessInterval);
         emit AccessIntervalUpdated(_accessInterval);
     }
 
@@ -68,7 +66,7 @@ contract NFTAccessScheduler is Ownable {
         for (uint256 i = 0; i < currentRound.length; i++) {
             hasAccessed[currentRound[i]] = false;
         }
-        roundEndTime = block.timestamp.add(accessInterval);
+        roundEndTime = block.timestamp + (accessInterval);
         currentIndex = 0;
         emit RoundEnded(currentRound);
     }
@@ -82,8 +80,12 @@ contract NFTAccessScheduler is Ownable {
         _moveToNextTurn();
     }
 
+    function getCurrentTurn() public view returns (address) {
+        return currentRound[currentIndex];
+    }
+
     function _moveToNextTurn() internal {
-        currentIndex = currentIndex.add(1);
+        currentIndex = currentIndex+ (1);
         if (currentIndex >= currentRound.length) {
             currentIndex = 0;
         }
