@@ -1,3 +1,93 @@
+# The Fedz Project
+
+Welcome to **The Fedz** – a revolutionary decentralized finance (DeFi) platform designed to redefine the stability and efficiency of stablecoins and synthetic derivatives in the blockchain ecosystem. Our mission is to create a robust financial mechanism that prevents bank runs, ensures liquidity, and enhances the stability of dollar derivatives with minimal capital requirements.
+
+## The Fedz Project
+
+The Fedz is pioneering a new category in DeFi, focusing on under-collateralized stablecoins and innovative financial instruments. By leveraging blockchain technology and advanced algorithmic models, The Fedz aims to address fundamental challenges in the current financial system, such as:
+
+- **Preventing Bank Runs**: Implement mechanisms to mitigate the risk of panic withdrawals and ensure the security of users' assets.
+- **Enhancing Liquidity**: Creating Private Liquidity Pools prioritizing stability and accessibility for NFT holders.
+- **Developing a New Financial Model**: Utilizing blockchain technology to build a sustainable and scalable financial ecosystem that offers unique opportunities to both traditional and digital asset investors.
+
+## Repository Structure
+
+This repository hosts the core components of The Fedz platform. Below is an overview of the architecture and key directories:
+
+### 1. Contracts
++--------------------+     +-----------------------+     +-------------------------+
+|                    |     |                       |     |                         |
+|  NFTWhitelist.sol   |     |  PriceBasedAccess-    |     |    NFTAccessScheduler   |
+|                    |     |   Control.sol         |     |      .sol               |
+|  - Manages NFT      |     |                       |     |                         |
+|    whitelist        |     |  - Monitors pool      |     |  - Schedules access     |
+|  - Adds/removes     |---->|    token ratio        |---->|    based on whitelist   |
+|    addresses        |     |  - Ensures balance    |     |  - Determines current   |
+|                    |     |    within tolerance    |     |    eligible address     |
++--------------------+     +-----------------------+     +-------------------------+
+                                   |                           |
+                                   |                           |
+                                   |                           |
+                                   |                           |
+                                   v                           v
+                            +------------------------------------------+
+                            |                                          |
+                            |            HookManager.sol               |
+                            |                                          |
+                            |  - Integrates NFTAccessScheduler and     |
+                            |    PriceBasedAccessControl               |
+                            |  - Manages access to the pool            |
+                            |    according to the whitelist and        |
+                            |    price balance                         |
+                            |  - Ensures only one address can access   |
+                            |    the pool at a time and the pool is    |
+                            |    balanced before allowing interaction  |
+                            |                                          |
+                            +------------------------------------------+
+                                              |
+                                              v
+                                       +----------------+
+                                       |                |
+                                       | Uniswap V4 Pool|
+                                       |                |
+                                       +----------------+
+
+Flow and Relations:
+NFTWhitelist.sol:
+
+Role: Manages a list of whitelisted addresses based on NFT ownership.
+Relation: Provides the list of addresses to NFTAccessScheduler.sol.
+NFTAccessScheduler.sol:
+
+Role: Manages the order and timing of access to the liquidity pool based on the whitelist.
+Relation: Interacts with NFTWhitelist.sol to get the list of eligible addresses and schedules their turns to access the pool.
+PriceBasedAccessControl.sol:
+
+Role: Ensures the liquidity pool's token ratio remains balanced within a specified tolerance.
+Relation: Monitors the token balances in the Uniswap V4 pool and provides access control based on price balance.
+HookManager.sol:
+
+Role: Integrates NFTAccessScheduler.sol and PriceBasedAccessControl.sol to manage access to the liquidity pool.
+Relation: Combines the scheduling and price balance checks to ensure that only the current eligible address, according to the whitelist, can interact with the pool, and only if the pool's token ratio is balanced.
+Uniswap V4 Pool:
+
+Role: The actual liquidity pool where interactions (e.g., adding/removing liquidity).
+Relation: HookManager.sol controls the access to this pool based on conditions from the NFTAccessScheduler.sol and PriceBasedAccessControl.sol.
+
+
+## Getting Started
+
+To start contributing or running The Fedz locally:
+
+1. **Clone the Repository:**
+
+   ```bash
+   git clone https://github.com/TheFedz/TheFedz.git
+   cd TheFedz
+
+
+
+
 # v4-template
 ### **A template for writing Uniswap v4 Hooks 🦄**
 
