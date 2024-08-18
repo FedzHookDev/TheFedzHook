@@ -22,6 +22,11 @@ contract FedzHook is BaseHook,  NFTWhitelist {
     int24 depegTick;
     address USDC;
     address FUSD;
+    uint24 baseFee;
+    uint24 crisisFee;
+    bool isInCrisis;
+
+    
 
     address public manager;
 
@@ -30,9 +35,31 @@ contract FedzHook is BaseHook,  NFTWhitelist {
         int24 tickLower;
         int24 tickUpper;
     }
+
+    event DepegThresholdUpdated(uint256 newThreshold);
+    event CrisisStateChanged(bool isInCrisis);
+    event LiquidityAdded(address user, uint128 amount);
+    event LiquidityRemoved(address user, uint128 amount);
+    event BeforeSwapExecuted(address user, bool zeroForOne, int256 amountIn);
+
+    event AfterSwapExecuted(address user, bool zeroForOne, int256 amountIn);
+    event RewardClaimed(address user, uint256 amount);
    
-    constructor(address _owner, IPoolManager _poolManager, address _nftContract) BaseHook(_poolManager) NFTWhitelist(_nftContract, _owner) {
+    constructor(
+        address _owner,
+        IPoolManager _poolManager,
+        address _nftContract,
+        address _USDC,
+        address _FUSD,
+        uint256 _depegThreshold
+    ) BaseHook(_poolManager) NFTWhitelist(_nftContract, _owner) {
         manager = _owner;
+        USDC = _USDC;
+        FUSD = _FUSD;
+        depegThreshold = _depegThreshold;
+        baseFee = 100; // 0.01%
+        crisisFee = 1000; // 0.1%
+        isInCrisis = false;
     }
 
     function getHookPermissions() public pure override returns (Hooks.Permissions memory){
@@ -71,13 +98,15 @@ contract FedzHook is BaseHook,  NFTWhitelist {
     */
 
     function beforeAddLiquidity(
-        address owner, // sender
+        address sender, // sender
         PoolKey calldata key, // key
         IPoolManager.ModifyLiquidityParams calldata params, // params
         bytes calldata // data
     )
         external
         override
+
+        onlyNFTOwner(sender)
         returns (bytes4)
     {
         int24 currentTick = getCurrentTick(key);
@@ -89,13 +118,15 @@ contract FedzHook is BaseHook,  NFTWhitelist {
     }
 
     function beforeRemoveLiquidity(
-        address, // sender
+        address sender, // sender
         PoolKey calldata, // key
         IPoolManager.ModifyLiquidityParams calldata, // params
         bytes calldata // data
+
     )
         external
         override
+        onlyNFTOwner(sender)
         returns (bytes4)
     {
         PoolKey memory key = _getPoolKey();
@@ -112,13 +143,15 @@ contract FedzHook is BaseHook,  NFTWhitelist {
     
 
     function beforeSwap(
-        address, // sender
+        address sender, // sender
         PoolKey calldata, // key
         IPoolManager.SwapParams calldata params, // params
         bytes calldata // data
     )
         external
         override
+
+        onlyNFTOwner(sender)
         returns (bytes4, BeforeSwapDelta, uint24)
 
     {
@@ -128,8 +161,11 @@ contract FedzHook is BaseHook,  NFTWhitelist {
         if(currentPrice < depegThreshold && params.zeroForOne == true){ //if price is below depeg threshold and token0 is being bought
             revert("Price is below depeg threshold");
         }
+        
+        uint24 fee = isInCrisis ? crisisFee : baseFee;
+        emit BeforeSwapExecuted(sender, params.zeroForOne, params.amountSpecified);
 
-        return (IHooks.beforeSwap.selector, BeforeSwapDelta.wrap(0), 0);
+        return (IHooks.beforeSwap.selector, BeforeSwapDelta.wrap(0), fee);
     }
 
     function getHookSwapFee(PoolKey calldata) external pure returns (uint8) {
@@ -146,6 +182,21 @@ contract FedzHook is BaseHook,  NFTWhitelist {
 
     function getFee(address sender, PoolKey calldata key, IPoolManager.SwapParams calldata params, bytes calldata data) external returns (uint24){
         return 10000;
+    }
+
+    function setDepegThreshold(uint256 newThreshold) external onlyOwner {
+        depegThreshold = newThreshold;
+        emit DepegThresholdUpdated(newThreshold);
+    }
+
+    function setFees(uint24 newBaseFee, uint24 newCrisisFee) external onlyOwner {
+        baseFee = newBaseFee;
+        crisisFee = newCrisisFee;
+    }
+
+    function setCrisisState(bool _isInCrisis) external onlyOwner {
+        isInCrisis = _isInCrisis;
+        emit CrisisStateChanged(_isInCrisis);
     }
 
     /*
@@ -168,7 +219,17 @@ contract FedzHook is BaseHook,  NFTWhitelist {
 
     }
     */
+    
+    
 
+
+    //TODO check if this is needed
+    mapping(address => uint256) private lastInteractionTime;
+
+    function checkFlashloanPrevention(address user) internal {
+        require(block.timestamp - lastInteractionTime[user] > 1, "Potential flashloan detected");
+        lastInteractionTime[user] = block.timestamp;
+    }
     
 
     function getCurrentPrice(PoolKey memory poolKey) public view returns (uint160 sqrtPriceX96) {
