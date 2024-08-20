@@ -12,9 +12,10 @@ import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 
 import {NFTAccessScheduler} from "./NFTAccessScheduler.sol";
 import {NFTWhitelist} from "./NFTWhitelist.sol";
+import {TurnBasedSystem} from "./TurnBasedSystem.sol";
 
 
-contract FedzHook is BaseHook,  NFTWhitelist {
+contract FedzHook is BaseHook, TurnBasedSystem {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
 
@@ -52,7 +53,7 @@ contract FedzHook is BaseHook,  NFTWhitelist {
         address _USDC,
         address _FUSD,
         uint256 _depegThreshold
-    ) BaseHook(_poolManager) NFTWhitelist(_nftContract, _owner) {
+    ) BaseHook(_poolManager) TurnBasedSystem(60, 60, 3, _owner) {
         manager = _owner;
         USDC = _USDC;
         FUSD = _FUSD;
