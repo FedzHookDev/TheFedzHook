@@ -86,7 +86,9 @@ To start contributing or running The Fedz locally:
    cd TheFedz
 
 
+### Tests
 
+run tests with forge test --match-contract FedzHookTest -vvvv --rpc-url https://ethereum-rpc.publicnode.com
 
 # v4-template
 ### **A template for writing Uniswap v4 Hooks 🦄**
