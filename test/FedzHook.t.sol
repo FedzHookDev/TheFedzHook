@@ -40,6 +40,8 @@ contract FedzHookTest is Test, Fixtures {
     address USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;  //Mainnet USDT
     address USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;  //Mainnet USDC
 
+    uint256 depegThreshold = 281474976710656; //0.9 USDT per FUSD in Q64.96 format
+
     //Utils
     // You must have first initialised the routers with deployFreshManagerAndRouters
     // If you only need the currencies (and not approvals) call deployAndMint2Currencies
@@ -60,7 +62,7 @@ contract FedzHookTest is Test, Fixtures {
 
     function deployMintAndApproveCurrencyFixed(IERC20 token) internal returns (Currency currency) {
         //MockERC20 token = deployTokens(1, 2 ** 255)[0];
-        deal(address(token), address(this), 10e18);
+        deal(address(token), address(this), 10e40);
 
 
         console2.log("Approving routers");
@@ -77,7 +79,7 @@ contract FedzHookTest is Test, Fixtures {
         ];
 
         for (uint256 i = 0; i < toApprove.length; i++) {
-            token.safeIncreaseAllowance(toApprove[i], 10e6);
+            token.safeIncreaseAllowance(toApprove[i], type(uint256).max);
             console2.log("Approved", toApprove[i]);
         }
 
@@ -100,11 +102,38 @@ contract FedzHookTest is Test, Fixtures {
         // Deploy the hook to an address with the correct flags
         address flags = address(
             uint160(
-                Hooks.BEFORE_SWAP_FLAG  | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
+                Hooks.BEFORE_SWAP_FLAG  | Hooks.AFTER_SWAP_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG
                     | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
             ) ^ (0x4444 << 144) // Namespace the hook to avoid collisions
         );
-        deployCodeTo("FedzHook.sol:FedzHook", abi.encode(address(this),manager,address(this),USDT,USDC,900), flags);
+
+        /*
+        To calculate the appropriate depegThreshold for a depeg up to 0.9$ when both USDC and USDT have 6 decimals, we need to consider the following:
+
+            The price is typically represented in terms of token1 per token0.
+            We want to detect when the price goes below 0.9 USDT per FUSD.
+            Both tokens have 6 decimals, so we don't need to adjust for decimal differences.
+            Here's how we can calculate it:
+
+            First, let's consider the price as a ratio: 0.9 USDT / 1 FUSD
+
+            Since both tokens have 6 decimals, we can represent this as: 900,000 / 1,000,000 = 0.9
+
+            In Uniswap V4, prices are often represented as fixed-point Q64.96 numbers. To convert our price to this format, we need to multiply by 2^96:
+
+            0.9 * 2^96 = 900,000 / 1,000,000 * 2^96 ≈ 79,228,162,514,264,337,593,543,950,336
+
+            The square root of this number is what's typically used in Uniswap V4 for price representation:
+
+            √(0.9 * 2^96) ≈ 281,474,976,710,656
+
+
+        */
+
+
+       
+
+        deployCodeTo("FedzHook.sol:FedzHook", abi.encode(address(this),manager,address(this),USDT,USDC,depegThreshold), flags);
         
 
 
@@ -146,9 +175,9 @@ contract FedzHookTest is Test, Fixtures {
     
     }
 
-    function testCounterHooks() public {
+    function testSwap() public {
         // positions were created in setup()
-       
+       //sell USDC for USDT
 
         // Perform a test swap //
         bool zeroForOne = true;
@@ -157,7 +186,23 @@ contract FedzHookTest is Test, Fixtures {
         // ------------------- //
 
         assertEq(int256(swapDelta.amount0()), amountSpecified);
+        assertGt(FedzHook(hook).getCurrentPrice(key), depegThreshold);
 
+       
+    }
+
+    function testDepegSwapShouldRevert() public {
+        // positions were created in setup()
+       // sell USDC for USDT
+
+        // Perform a test swap //
+        bool zeroForOne = true;
+        int256 amountSpecified = -1e30; // negative number indicates exact input swap!
+        vm.expectRevert(); //expect revert since the swap price after is below the depeg threshold
+        BalanceDelta swapDelta = swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+        // ------------------- //
+
+       
        
     }
 

@@ -45,6 +45,7 @@ contract FedzHook is BaseHook, TurnBasedSystem {
 
     event AfterSwapExecuted(address user, bool zeroForOne, int256 amountIn);
     event RewardClaimed(address user, uint256 amount);
+    event PriceIs(uint256 price); //Test only
    
     constructor(
         address _owner,
@@ -72,7 +73,7 @@ contract FedzHook is BaseHook, TurnBasedSystem {
             beforeRemoveLiquidity: true,
             afterRemoveLiquidity: false,
             beforeSwap: true,
-            afterSwap: false,
+            afterSwap: true,
             beforeDonate: false,
             afterDonate: false,
             beforeSwapReturnDelta: false,
@@ -110,12 +111,13 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         
         returns (bytes4)
     {
-        /*
-        int24 currentTick = getCurrentTick(key);
-        if(params.tickUpper > depegTick ){ //if price is below depeg threshold and token0 is being bought
+        // Get the current sqrt(price) from the pool
+        uint160 currentSqrtPrice = getCurrentPrice(key);
+
+        // Compare the current sqrt(price) directly with the depegThreshold
+        if (currentSqrtPrice < depegThreshold) {
             revert("Price is below depeg threshold");
         }
-        */
 
 
         return IHooks.beforeAddLiquidity.selector;
@@ -123,7 +125,7 @@ contract FedzHook is BaseHook, TurnBasedSystem {
 
     function beforeRemoveLiquidity(
         address sender, // sender
-        PoolKey calldata, // key
+        PoolKey calldata key, // key
         IPoolManager.ModifyLiquidityParams calldata, // params
         bytes calldata // data
 
@@ -132,13 +134,15 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         override
         returns (bytes4)
     {
-        /*
-        PoolKey memory key = _getPoolKey();
-        uint256 currentPrice = calculatePrice(getCurrentPrice(key), getDecimals(key.currency0), getDecimals(key.currency1));
-        if(currentPrice < depegThreshold){ //if price is below depeg threshold and token0 is being bought
+        
+        // Get the current sqrt(price) from the pool
+        uint160 currentSqrtPrice = getCurrentPrice(key);
+
+        // Compare the current sqrt(price) directly with the depegThreshold
+        if (currentSqrtPrice < depegThreshold) {
             revert("Price is below depeg threshold");
         }
-        */
+        
 
         return IHooks.beforeRemoveLiquidity.selector;
     }
@@ -149,7 +153,7 @@ contract FedzHook is BaseHook, TurnBasedSystem {
 
     function beforeSwap(
         address sender, // sender
-        PoolKey calldata, // key
+        PoolKey calldata key, // key
         IPoolManager.SwapParams calldata params, // params
         bytes calldata // data
     )
@@ -159,18 +163,44 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         returns (bytes4, BeforeSwapDelta, uint24)
 
     {
-        /*
-        PoolKey memory key = _getPoolKey();
-        uint256 currentPrice = calculatePrice(getCurrentPrice(key), getDecimals(key.currency0), getDecimals(key.currency1));
-        if(currentPrice < depegThreshold && params.zeroForOne == true){ //if price is below depeg threshold and token0 is being bought
+        
+        // Get the current sqrt(price) from the pool
+        uint160 currentSqrtPrice = getCurrentPrice(key);
+        emit PriceIs(uint256(currentSqrtPrice));
+
+        // Compare the current sqrt(price) directly with the depegThreshold
+        if (currentSqrtPrice < depegThreshold) {
             revert("Price is below depeg threshold");
         }
-        */
+        
         uint24 fee = isInCrisis ? crisisFee : baseFee;
         emit BeforeSwapExecuted(sender, params.zeroForOne, params.amountSpecified);
         
 
         return (IHooks.beforeSwap.selector, BeforeSwapDelta.wrap(0), fee);
+    }
+
+    function afterSwap(
+        address sender, // sender
+        PoolKey calldata key, // key
+        IPoolManager.SwapParams calldata params, // params
+        BalanceDelta delta, // delta
+        bytes calldata // data
+    )
+        external
+        override
+        returns (bytes4, int128)
+    {
+        // Get the current sqrt(price) from the pool
+        uint160 currentSqrtPrice = getCurrentPrice(key);
+        emit PriceIs(uint256(currentSqrtPrice));
+
+        // Compare the current sqrt(price) directly with the depegThreshold
+        if (currentSqrtPrice < depegThreshold) {
+            revert("Price is below depeg threshold");
+        }
+        emit AfterSwapExecuted(sender, params.zeroForOne, params.amountSpecified);
+        return (IHooks.afterSwap.selector, 0);
     }
 
     /*
@@ -243,8 +273,15 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         (sqrtPriceX96,,,) = poolManager.getSlot0(poolKey.toId());
     }
 
-    function calculatePrice(uint160 sqrtPriceX96, uint8 token0Decimals, uint8 token1Decimals) public pure returns (uint256) {
+    function calculatePrice2(uint160 sqrtPriceX96, uint8 token0Decimals, uint8 token1Decimals) public  returns (uint256) {
         uint256 price = uint256(sqrtPriceX96) * uint256(sqrtPriceX96) * (10**token1Decimals) / (2**192) / (10**token0Decimals);
+        emit PriceIs(price);
+        return price;
+    }
+
+     function calculatePrice(uint160 sqrtPriceX96) public  returns (uint256) {
+        uint256 price = uint256(sqrtPriceX96) **2  / (2**192);
+        emit PriceIs(price);
         return price;
     }
 
