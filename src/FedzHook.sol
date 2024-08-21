@@ -21,7 +21,7 @@ contract FedzHook is BaseHook, TurnBasedSystem {
 
     uint256 depegThreshold;
     int24 depegTick;
-    address USDC;
+    address USDT;
     address FUSD;
     uint24 baseFee;
     uint24 crisisFee;
@@ -50,12 +50,12 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         address _owner,
         IPoolManager _poolManager,
         address _nftContract,
-        address _USDC,
+        address _USDT,
         address _FUSD,
         uint256 _depegThreshold
     ) BaseHook(_poolManager) TurnBasedSystem(60, 60, 3, _owner, _nftContract) {
         manager = _owner;
-        USDC = _USDC;
+        USDT = _USDT;
         FUSD = _FUSD;
         depegThreshold = _depegThreshold;
         baseFee = 3000; // 0.01%
@@ -132,11 +132,13 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         override
         returns (bytes4)
     {
+        /*
         PoolKey memory key = _getPoolKey();
         uint256 currentPrice = calculatePrice(getCurrentPrice(key), getDecimals(key.currency0), getDecimals(key.currency1));
         if(currentPrice < depegThreshold){ //if price is below depeg threshold and token0 is being bought
             revert("Price is below depeg threshold");
         }
+        */
 
         return IHooks.beforeRemoveLiquidity.selector;
     }
@@ -157,15 +159,16 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         returns (bytes4, BeforeSwapDelta, uint24)
 
     {
-
+        /*
         PoolKey memory key = _getPoolKey();
         uint256 currentPrice = calculatePrice(getCurrentPrice(key), getDecimals(key.currency0), getDecimals(key.currency1));
         if(currentPrice < depegThreshold && params.zeroForOne == true){ //if price is below depeg threshold and token0 is being bought
             revert("Price is below depeg threshold");
         }
-        
+        */
         uint24 fee = isInCrisis ? crisisFee : baseFee;
         emit BeforeSwapExecuted(sender, params.zeroForOne, params.amountSpecified);
+        
 
         return (IHooks.beforeSwap.selector, BeforeSwapDelta.wrap(0), fee);
     }
@@ -287,7 +290,7 @@ contract FedzHook is BaseHook, TurnBasedSystem {
     function _getPoolKey() private view returns (PoolKey memory) {
         return PoolKey({
             currency0: Currency.wrap(address(FUSD)),
-            currency1: Currency.wrap(address(USDC)),
+            currency1: Currency.wrap(address(USDT)),
             fee:  100, // 0xE00000 = 111 //todo change fee accordingly
             tickSpacing: 60,
             hooks: IHooks(address(this))

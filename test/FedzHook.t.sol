@@ -60,7 +60,7 @@ contract FedzHookTest is Test, Fixtures {
 
     function deployMintAndApproveCurrencyFixed(IERC20 token) internal returns (Currency currency) {
         //MockERC20 token = deployTokens(1, 2 ** 255)[0];
-        deal(address(token), address(this), 10e6);
+        deal(address(token), address(this), 10e18);
 
 
         console2.log("Approving routers");
@@ -104,15 +104,9 @@ contract FedzHookTest is Test, Fixtures {
                     | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
             ) ^ (0x4444 << 144) // Namespace the hook to avoid collisions
         );
-        //deployCodeTo("src/FedzHook.sol:FedzHook", abi.encode(manager), flags);
+        deployCodeTo("FedzHook.sol:FedzHook", abi.encode(address(this),manager,address(this),USDT,USDC,900), flags);
         
 
-        bytes memory bytecode = abi.encodePacked(
-            type(FedzHook).creationCode,
-            abi.encode(manager)
-        );
-        vm.etch(flags, bytecode);
-        
 
         hook = FedzHook(flags);
 
@@ -135,7 +129,7 @@ contract FedzHookTest is Test, Fixtures {
 
         (tokenId,) = posm.mint(
             config,
-            10e18,
+            10e7,
             MAX_SLIPPAGE_ADD_LIQUIDITY,
             MAX_SLIPPAGE_ADD_LIQUIDITY,
             address(this),
@@ -143,7 +137,7 @@ contract FedzHookTest is Test, Fixtures {
             ZERO_BYTES
         );
 
-
+        console2.log("setup done");
         
 
     
@@ -158,7 +152,7 @@ contract FedzHookTest is Test, Fixtures {
 
         // Perform a test swap //
         bool zeroForOne = true;
-        int256 amountSpecified = -1e18; // negative number indicates exact input swap!
+        int256 amountSpecified = -1e6; // negative number indicates exact input swap!
         BalanceDelta swapDelta = swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
         // ------------------- //
 
@@ -171,7 +165,7 @@ contract FedzHookTest is Test, Fixtures {
         // positions were created in setup()
        
         // remove liquidity
-        uint256 liquidityToRemove = 1e18;
+        uint256 liquidityToRemove = 1e6;
         posm.decreaseLiquidity(
             tokenId,
             config,
