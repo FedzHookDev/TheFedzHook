@@ -53,13 +53,13 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         address _USDC,
         address _FUSD,
         uint256 _depegThreshold
-    ) BaseHook(_poolManager) TurnBasedSystem(60, 60, 3, _owner) {
+    ) BaseHook(_poolManager) TurnBasedSystem(60, 60, 3, _owner, _nftContract) {
         manager = _owner;
         USDC = _USDC;
         FUSD = _FUSD;
         depegThreshold = _depegThreshold;
-        baseFee = 100; // 0.01%
-        crisisFee = 1000; // 0.1%
+        baseFee = 3000; // 0.01%
+        crisisFee = 6000; // 0.1%
         isInCrisis = false;
     }
 
@@ -107,13 +107,16 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         external
         override
 
-        onlyNFTOwner(sender)
+        
         returns (bytes4)
     {
+        /*
         int24 currentTick = getCurrentTick(key);
         if(params.tickUpper > depegTick ){ //if price is below depeg threshold and token0 is being bought
             revert("Price is below depeg threshold");
         }
+        */
+
 
         return IHooks.beforeAddLiquidity.selector;
     }
@@ -127,7 +130,6 @@ contract FedzHook is BaseHook, TurnBasedSystem {
     )
         external
         override
-        onlyNFTOwner(sender)
         returns (bytes4)
     {
         PoolKey memory key = _getPoolKey();
@@ -152,7 +154,6 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         external
         override
 
-        onlyNFTOwner(sender)
         returns (bytes4, BeforeSwapDelta, uint24)
 
     {
@@ -169,16 +170,18 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         return (IHooks.beforeSwap.selector, BeforeSwapDelta.wrap(0), fee);
     }
 
-    function getHookSwapFee(PoolKey calldata) external pure returns (uint8) {
-        return 100;
+    /*
+
+    function getHookSwapFee(PoolKey calldata) external pure returns (uint24) {
+        return 3000;
     }
 
-    function getHookWithdrawFee(PoolKey calldata) external pure returns (uint8) {
-        return 100;
+    function getHookWithdrawFee(PoolKey calldata) external pure returns (uint24) {
+        return 6000;
     }
 
     function getHookFees(PoolKey calldata key) external view returns (uint24){
-        return 100;
+        return 3000;
     }
 
     function getFee(address sender, PoolKey calldata key, IPoolManager.SwapParams calldata params, bytes calldata data) external returns (uint24){
@@ -285,7 +288,7 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         return PoolKey({
             currency0: Currency.wrap(address(FUSD)),
             currency1: Currency.wrap(address(USDC)),
-            fee:  300, // 0xE00000 = 111 //todo change fee accordingly
+            fee:  100, // 0xE00000 = 111 //todo change fee accordingly
             tickSpacing: 60,
             hooks: IHooks(address(this))
         });

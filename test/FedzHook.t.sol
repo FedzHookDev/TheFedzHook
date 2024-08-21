@@ -104,13 +104,24 @@ contract FedzHookTest is Test, Fixtures {
                     | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG
             ) ^ (0x4444 << 144) // Namespace the hook to avoid collisions
         );
-        deployCodeTo("FedzHook.sol:FedzHook", abi.encode(manager), flags);
+        //deployCodeTo("src/FedzHook.sol:FedzHook", abi.encode(manager), flags);
+        
+
+        bytes memory bytecode = abi.encodePacked(
+            type(FedzHook).creationCode,
+            abi.encode(manager)
+        );
+        vm.etch(flags, bytecode);
+        
+
         hook = FedzHook(flags);
 
         // Create the pool
-        key = PoolKey(currency0, currency1, 3000, 60, IHooks(hook));
+        key = PoolKey(currency0, currency1, 100, 60, IHooks(hook));
         poolId = key.toId();
         manager.initialize(key, SQRT_PRICE_1_1, ZERO_BYTES);
+
+        console2.log("Deploying position");
 
         // Provide full-range liquidity to the pool
         config = PositionConfig({
@@ -118,15 +129,22 @@ contract FedzHookTest is Test, Fixtures {
             tickLower: TickMath.minUsableTick(key.tickSpacing),
             tickUpper: TickMath.maxUsableTick(key.tickSpacing)
         });
+
+        console2.log("Minting position");
+
+
         (tokenId,) = posm.mint(
             config,
-            10_000e18,
+            10e18,
             MAX_SLIPPAGE_ADD_LIQUIDITY,
             MAX_SLIPPAGE_ADD_LIQUIDITY,
             address(this),
             block.timestamp,
             ZERO_BYTES
         );
+
+
+        
 
     
 

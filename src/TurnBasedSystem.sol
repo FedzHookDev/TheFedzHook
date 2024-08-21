@@ -25,9 +25,8 @@ contract TurnBasedSystem is NFTWhitelist {
     event TurnSkipped(address player, address skipper);
     event PlayerPenalized(address player, uint256 consecutiveSkips);
 
-    address public _nftContract;
 
-    constructor(uint256 _turnDuration, uint256 _turnTimeThreshold, uint256 _maxConsecutiveSkips, address _owner) NFTWhitelist(_nftContract, _owner) {
+    constructor(uint256 _turnDuration, uint256 _turnTimeThreshold, uint256 _maxConsecutiveSkips, address _owner, address _nftContract) NFTWhitelist(_nftContract, _owner) {
         turnDuration = _turnDuration;
         turnTimeThreshold = _turnTimeThreshold;
         maxConsecutiveSkips = _maxConsecutiveSkips;
