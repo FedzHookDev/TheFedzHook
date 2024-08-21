@@ -15,12 +15,17 @@ import {DeployPermit2} from "permit2/test/utils/DeployPermit2.sol";
 import {IERC721Permit_v4} from "v4-periphery/src/interfaces/IERC721Permit_v4.sol";
 import {IEIP712_v4} from "v4-periphery/src/interfaces/IEIP712_v4.sol";
 import {ERC721PermitHashLibrary} from "v4-periphery/src/libraries/ERC721PermitHash.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20 as IERC20OpenZeppelin} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 
 /// @notice A shared test contract that wraps the v4-core deployers contract and exposes basic liquidity operations on posm.
 contract Fixtures is Deployers, DeployPermit2 {
     uint256 constant STARTING_USER_BALANCE = 10_000_000 ether;
     uint256 constant MAX_SLIPPAGE_ADD_LIQUIDITY = type(uint256).max;
     uint256 constant MAX_SLIPPAGE_REMOVE_LIQUIDITY = 0;
+
+    using SafeERC20 for IERC20;
 
     IPositionManager posm;
     IAllowanceTransfer permit2;
@@ -49,7 +54,7 @@ contract Fixtures is Deployers, DeployPermit2 {
     function approvePosmCurrency(Currency currency) internal {
         // Because POSM uses permit2, we must execute 2 permits/approvals.
         // 1. First, the caller must approve permit2 on the token.
-        IERC20(Currency.unwrap(currency)).approve(address(permit2), type(uint256).max);
+        SafeERC20.safeIncreaseAllowance(IERC20OpenZeppelin(Currency.unwrap(currency)), address(permit2), type(uint256).max);
         // 2. Then, the caller must approve POSM as a spender of permit2. TODO: This could also be a signature.
         permit2.approve(Currency.unwrap(currency), address(posm), type(uint160).max, type(uint48).max);
     }

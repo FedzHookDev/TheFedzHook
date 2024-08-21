@@ -39,7 +39,7 @@ contract TurnBasedSystem is NFTWhitelist {
         _;
     }
 
-    function startNextTurn() public {
+    function startNextTurn() public onlyNFTOwner(msg.sender){
         require(block.timestamp >= currentTurn.endTime || block.timestamp >= currentTurn.startTime + turnTimeThreshold, "Current turn not finished or threshold not reached");
         
         address nextPlayer = getNextEligiblePlayer();
@@ -52,7 +52,7 @@ contract TurnBasedSystem is NFTWhitelist {
         emit TurnStarted(nextPlayer, currentTurn.startTime, currentTurn.endTime);
     }
 
-    function skipTurn() external {
+    function skipTurn() public onlyNFTOwner(msg.sender) {
         require(msg.sender != currentTurn.player, "Cannot skip your own turn");
         require(block.timestamp >= currentTurn.startTime + turnTimeThreshold, "Turn time threshold not reached");
         
