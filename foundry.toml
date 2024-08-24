@@ -1,3 +1,6 @@
+[rpc_endpoints]
+mainnet = "https://eth.llamarpc.com"
+
 [profile.default]
 src = "src"
 out = "out"
@@ -6,6 +9,11 @@ ffi = true
 fs_permissions = [{ access = "read-write", path = ".forge-snapshots/"}]
 solc_version = "0.8.26"
 evm_version = "cancun"
+eth_rpc_url = "${mainnet}"
+
+
+
+
 
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
