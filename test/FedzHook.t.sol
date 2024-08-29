@@ -23,8 +23,11 @@ import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 import {IPositionManager} from "v4-periphery/src/interfaces/IPositionManager.sol";
 import {EasyPosm} from "./utils/EasyPosm.sol";
 import {Fixtures} from "./utils/Fixtures.sol";
+import {TurnBasedSystem} from "../src/TurnBasedSystem.sol";
+import {MockERC721} from "../src/MockERC721.sol";   
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
-contract FedzHookTest is Test, Fixtures {
+contract FedzHookTest is Test, Fixtures, IERC721Receiver {
     using EasyPosm for IPositionManager;
     using PoolIdLibrary for PoolKey;
     using CurrencyLibrary for Currency;
@@ -40,9 +43,34 @@ contract FedzHookTest is Test, Fixtures {
     address USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;  //Mainnet USDT
     address USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;  //Mainnet USDC
 
+    address test = address(this);
+
     uint256 depegThreshold = 281474976710656; //0.9 USDT per FUSD in Q64.96 format
 
+    MockERC721 mockNFT = new MockERC721("NFT", "NFT", address(this));
+    
+
+    //NFT.mint(address(this)); //Mint Mock NFT
+
+    TurnBasedSystem turnSystem = new TurnBasedSystem(
+            1 hours, // turnDuration
+            15 minutes, // turnTimeThreshold
+            3, // maxConsecutiveSkips
+            address(mockNFT), // nftContract (replace with actual NFT contract if needed)
+            address(this) // owner
+        );
+
+
     //Utils
+    //NFT receiving function
+     function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes memory
+    ) public virtual override returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
     // You must have first initialised the routers with deployFreshManagerAndRouters
     // If you only need the currencies (and not approvals) call deployAndMint2Currencies
     function deployMintAndApprove2CurrenciesFixed() internal returns (Currency, Currency) {
@@ -97,6 +125,9 @@ contract FedzHookTest is Test, Fixtures {
         console2.log("Deploying POSM");
         deployAndApprovePosm(manager);
 
+        
+        mockNFT.mint(test); //Mint Mock NFT
+
 
         console2.log("Deploying Hook");
         // Deploy the hook to an address with the correct flags
@@ -133,7 +164,7 @@ contract FedzHookTest is Test, Fixtures {
 
        
 
-        deployCodeTo("FedzHook.sol:FedzHook", abi.encode(address(this),manager,address(this),USDT,USDC,depegThreshold), flags);
+        deployCodeTo("FedzHook.sol:FedzHook", abi.encode(address(this),manager,address(mockNFT),USDT,USDC,depegThreshold, address(turnSystem)), flags);
         
 
 
@@ -155,6 +186,16 @@ contract FedzHookTest is Test, Fixtures {
 
         console2.log("Minting position");
 
+        vm.prank(address(posm));
+        turnSystem.joinQueue();
+
+        turnSystem.startNextTurn(address(this));
+
+        mockNFT.mintToContract(address(posm)); //Mint Mock NFT
+
+        console2.log("is addres nft holder ? :" , mockNFT.isNFTHolder(address(posm)));
+
+        console2.log("current player:" , turnSystem.getCurrentPlayer());
 
         (tokenId,) = posm.mint(
             config,
@@ -166,16 +207,21 @@ contract FedzHookTest is Test, Fixtures {
             ZERO_BYTES
         );
 
-        console2.log("setup done");
-        
+         // positions were created in setup()
+        mockNFT.mintToContract(address(swapRouter)); //Mint Mock NFT
+        vm.prank(address(swapRouter));
+        turnSystem.joinQueue(); //join queue for swapper
 
-    
+        console2.log("setup done");
+
+        
 
 
     
     }
 
     function testSwap() public {
+        vm.warp(block.timestamp + 100 minutes); //warp so its swapRouter turn
         // positions were created in setup()
        //sell USDC for USDT
 
@@ -191,8 +237,49 @@ contract FedzHookTest is Test, Fixtures {
        
     }
 
+    function testSwapDuringTurn() public {
+       
+        // Start a turn for this address
+        console2.log("current player:" , turnSystem.getCurrentPlayer());
+
+        console2.log("next player:" , turnSystem.getNextEligiblePlayer());
+    
+
+        vm.warp(block.timestamp + 100 minutes);
+        //turnSystem.skipTurn();
+
+      
+
+        console2.log("current player:" , turnSystem.getCurrentPlayer());
+
+         
+        
+        
+
+        // Perform a test swap
+        bool zeroForOne = true;
+        int256 amountSpecified = -1e6;
+        BalanceDelta swapDelta = swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+
+        assertEq(int256(swapDelta.amount0()), amountSpecified);
+        assertGt(FedzHook(hook).getCurrentPrice(key), depegThreshold);
+    }
+
+    function testSwapOutsideTurn() public {
+       
+        // Ensure it's not this address's turn
+        console2.log("current player:" , turnSystem.getCurrentPlayer());
+
+        // Attempt a swap, which should revert
+        bool zeroForOne = true;
+        int256 amountSpecified = -1e6;
+        vm.expectRevert();
+        swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+    }
+
+
     function testDepegSwapShouldRevert() public {
-        // positions were created in setup()
+       vm.warp(block.timestamp + 100 minutes); //warp so its swapRouter turn
        // sell USDC for USDT
 
         // Perform a test swap //

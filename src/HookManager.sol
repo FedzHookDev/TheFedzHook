@@ -22,7 +22,7 @@ contract HookManager is Ownable {
     }
 
     modifier onlyEligible() {
-        require(accessScheduler.getCurrentTurn() == msg.sender, "Not your turn");
+        //require(accessScheduler.getCurrentTurn() == msg.sender, "Not your turn");
         require(priceAccessControl.canPerformAction(), "Pool not balanced");
         _;
     }

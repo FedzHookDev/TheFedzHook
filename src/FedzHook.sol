@@ -13,9 +13,10 @@ import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 import {NFTAccessScheduler} from "./NFTAccessScheduler.sol";
 import {NFTWhitelist} from "./NFTWhitelist.sol";
 import {TurnBasedSystem} from "./TurnBasedSystem.sol";
+import {NFTAccessScheduler} from "./NFTAccessScheduler.sol";
 
 
-contract FedzHook is BaseHook, TurnBasedSystem {
+contract FedzHook is BaseHook, NFTWhitelist  {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
 
@@ -26,6 +27,9 @@ contract FedzHook is BaseHook, TurnBasedSystem {
     uint24 baseFee;
     uint24 crisisFee;
     bool isInCrisis;
+
+    TurnBasedSystem public immutable turnSystem;
+
 
     
 
@@ -53,12 +57,17 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         address _nftContract,
         address _USDT,
         address _FUSD,
-        uint256 _depegThreshold
-    ) BaseHook(_poolManager) TurnBasedSystem(60, 60, 3, _owner, _nftContract) {
+        uint256 _depegThreshold, 
+        address _turnSystem
+
+        
+    ) BaseHook(_poolManager) NFTWhitelist(  _nftContract, _owner) {
         manager = _owner;
         USDT = _USDT;
         FUSD = _FUSD;
         depegThreshold = _depegThreshold;
+        turnSystem = TurnBasedSystem(_turnSystem);
+
         baseFee = 3000; // 0.01%
         crisisFee = 6000; // 0.1%
         isInCrisis = false;
@@ -99,6 +108,11 @@ contract FedzHook is BaseHook, TurnBasedSystem {
     }
     */
 
+    modifier _checkPlayerTurn(address player) {
+        require(turnSystem.isPlayerTurn(player), "Not player's turn");
+        _;
+    }
+
     function beforeAddLiquidity(
         address sender, // sender
         PoolKey calldata key, // key
@@ -106,11 +120,15 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         bytes calldata // data
     )
         external
+        _checkPlayerTurn(sender)
+        onlyNFTOwner(sender)
         override
 
         
         returns (bytes4)
     {
+
+        
         // Get the current sqrt(price) from the pool
         uint160 currentSqrtPrice = getCurrentPrice(key);
 
@@ -118,6 +136,7 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         if (currentSqrtPrice < depegThreshold) {
             revert("Price is below depeg threshold");
         }
+        
 
 
         return IHooks.beforeAddLiquidity.selector;
@@ -131,6 +150,8 @@ contract FedzHook is BaseHook, TurnBasedSystem {
 
     )
         external
+        _checkPlayerTurn(sender)
+        onlyNFTOwner(sender)
         override
         returns (bytes4)
     {
@@ -158,12 +179,26 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         bytes calldata // data
     )
         external
+        //_checkPlayerTurn(sender)
+        onlyNFTOwner(sender)
         override
 
         returns (bytes4, BeforeSwapDelta, uint24)
 
     {
+          // Check if it's the sender's turn
+        //require(turnSystem.isPlayerTurn(sender), "Not your turn");
+
         
+        // If the current player hasn't played, skip their turn
+        if (!turnSystem.hasPlayerPlayed(turnSystem.getCurrentPlayer())) {
+            turnSystem.skipTurn(sender);
+        } else {
+            // If the current player has played, start the next turn
+            turnSystem.startNextTurn(sender);
+        }
+    
+        /* Should not be needed as price checks happens after swap
         // Get the current sqrt(price) from the pool
         uint160 currentSqrtPrice = getCurrentPrice(key);
         emit PriceIs(uint256(currentSqrtPrice));
@@ -172,9 +207,11 @@ contract FedzHook is BaseHook, TurnBasedSystem {
         if (currentSqrtPrice < depegThreshold) {
             revert("Price is below depeg threshold");
         }
+        */
         
         uint24 fee = isInCrisis ? crisisFee : baseFee;
         emit BeforeSwapExecuted(sender, params.zeroForOne, params.amountSpecified);
+        
         
 
         return (IHooks.beforeSwap.selector, BeforeSwapDelta.wrap(0), fee);
