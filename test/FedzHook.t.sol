@@ -293,9 +293,9 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
        
     }
 
-    function testLiquidityHooks() public {
+    function testRemoveLiquidityInTurn() public {
         // positions were created in setup()
-       
+        console2.log("current player:" , turnSystem.getCurrentPlayer());
         // remove liquidity
         uint256 liquidityToRemove = 1e6;
         posm.decreaseLiquidity(
@@ -311,4 +311,28 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
 
        
     }
+
+    function testRemoveLiquidityBeforeTurn() public {
+        // positions were created in setup()
+        console2.log("current player:", turnSystem.getCurrentPlayer());
+        vm.warp(block.timestamp + 100 minutes); //warp so its swapRouter turn
+        turnSystem.skipTurn(address(this));
+
+        // remove liquidity
+        uint256 liquidityToRemove = 1e6;
+
+        // Move vm.expectRevert() here, right before the call that should revert
+        //vm.expectRevert();
+        posm.decreaseLiquidity(
+            tokenId,
+            config,
+            liquidityToRemove,
+            MAX_SLIPPAGE_REMOVE_LIQUIDITY,
+            MAX_SLIPPAGE_REMOVE_LIQUIDITY,
+            address(this),
+            block.timestamp,
+            ZERO_BYTES
+        );
+    }
+
 }

@@ -109,7 +109,16 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     */
 
     modifier _checkPlayerTurn(address player) {
-        require(turnSystem.isPlayerTurn(player), "Not player's turn");
+        // If the current player hasn't played, skip their turn
+        if (!turnSystem.hasPlayerPlayed(turnSystem.getCurrentPlayer()) && turnSystem.getCurrentPlayer() != player) {
+            turnSystem.skipTurn(player);
+        } else if(turnSystem.getCurrentPlayer() != player){
+            // If the current player has played, start the next turn
+            turnSystem.startNextTurn(player);
+        }else{
+             require(turnSystem.isPlayerTurn(player), "Not player's turn");
+        }
+       
         _;
     }
 
@@ -120,7 +129,6 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         bytes calldata // data
     )
         external
-        _checkPlayerTurn(sender)
         onlyNFTOwner(sender)
         override
 
@@ -179,7 +187,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         bytes calldata // data
     )
         external
-        //_checkPlayerTurn(sender)
+        _checkPlayerTurn(sender)
         onlyNFTOwner(sender)
         override
 
@@ -190,13 +198,6 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         //require(turnSystem.isPlayerTurn(sender), "Not your turn");
 
         
-        // If the current player hasn't played, skip their turn
-        if (!turnSystem.hasPlayerPlayed(turnSystem.getCurrentPlayer())) {
-            turnSystem.skipTurn(sender);
-        } else {
-            // If the current player has played, start the next turn
-            turnSystem.startNextTurn(sender);
-        }
     
         /* Should not be needed as price checks happens after swap
         // Get the current sqrt(price) from the pool
