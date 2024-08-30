@@ -12,7 +12,7 @@ import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 
 import {NFTAccessScheduler} from "./NFTAccessScheduler.sol";
 import {NFTWhitelist} from "./NFTWhitelist.sol";
-import {TurnBasedSystem} from "./TurnBasedSystem.sol";
+import {TimeSlotSystem} from "./TimeSlotSystem.sol";
 import {NFTAccessScheduler} from "./NFTAccessScheduler.sol";
 
 
@@ -28,7 +28,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     uint24 crisisFee;
     bool isInCrisis;
 
-    TurnBasedSystem public immutable turnSystem;
+    TimeSlotSystem public  timeSlotSystem;
 
 
     
@@ -58,7 +58,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         address _USDT,
         address _FUSD,
         uint256 _depegThreshold, 
-        address _turnSystem
+        address _timeSlotSystem
 
         
     ) BaseHook(_poolManager) NFTWhitelist(  _nftContract, _owner) {
@@ -66,7 +66,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         USDT = _USDT;
         FUSD = _FUSD;
         depegThreshold = _depegThreshold;
-        turnSystem = TurnBasedSystem(_turnSystem);
+        timeSlotSystem = TimeSlotSystem(_timeSlotSystem);
 
         baseFee = 3000; // 0.01%
         crisisFee = 6000; // 0.1%
@@ -110,14 +110,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
 
     modifier _checkPlayerTurn(address player) {
         // If the current player hasn't played, skip their turn
-        if (!turnSystem.hasPlayerPlayed(turnSystem.getCurrentPlayer()) && turnSystem.getCurrentPlayer() != player) {
-            turnSystem.skipTurn(player);
-        } else if(turnSystem.getCurrentPlayer() != player){
-            // If the current player has played, start the next turn
-            turnSystem.startNextTurn(player);
-        }else{
-             require(turnSystem.isPlayerTurn(player), "Not player's turn");
-        }
+       require(timeSlotSystem.canPlayerAct(player), "Not your turn");
        
         _;
     }
@@ -130,6 +123,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     )
         external
         onlyNFTOwner(sender)
+        _checkPlayerTurn(sender)
         override
 
         
