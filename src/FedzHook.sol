@@ -9,6 +9,7 @@ import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/src/types/BeforeS
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
+import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 
 import {NFTAccessScheduler} from "./NFTAccessScheduler.sol";
 import {NFTWhitelist} from "./NFTWhitelist.sol";
@@ -49,7 +50,10 @@ contract FedzHook is BaseHook, NFTWhitelist  {
 
     event AfterSwapExecuted(address user, bool zeroForOne, int256 amountIn);
     event RewardClaimed(address user, uint256 amount);
+    event LiquidityAdded(address indexed sender, uint128 liquidity, int24 tickLower, int24 tickUpper);
+
     event PriceIs(uint256 price); //Test only
+    
    
     constructor(
         address _owner,
@@ -135,8 +139,8 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         uint160 currentSqrtPrice = getCurrentPrice(key);
 
         // Compare the current sqrt(price) directly with the depegThreshold
-        if (currentSqrtPrice < depegThreshold) {
-            revert("Price is below depeg threshold");
+        if (currentSqrtPrice < depegThreshold && params.tickLower >= TickMath.getTickAtSqrtPrice(currentSqrtPrice)) {
+            revert("When depegged, can only add liquidity below current price");
         }
         
 

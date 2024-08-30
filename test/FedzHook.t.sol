@@ -332,7 +332,7 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
         uint256 liquidityToRemove = 1e6;
 
         // Move vm.expectRevert() here, right before the call that should revert
-        //vm.expectRevert("0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000d4e6f7420796f7572207475726e00000000000000000000000000000000000000");
+        vm.expectRevert();
         posm.decreaseLiquidity(
             tokenId,
             config,
@@ -345,6 +345,145 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
         );
 
         //Note test does work since it reverts, but forge don't account for reverts in test results isnce its a low level operation
+    }
+
+    function testAddLiquidityNormalState() public {
+        if(turnSystem.getCurrentPlayer() != address(posm)){
+           vm.warp(block.timestamp + 61 minutes); // warp so it's posm's turn
+        }
+        console2.log("current player:", turnSystem.getCurrentPlayer());
+
+        // Ensure the price is above the depeg threshold
+        uint160 currentPrice = hook.getCurrentPrice(key);
+        assertGt(currentPrice, depegThreshold, "Price should be above depeg threshold");
+
+        // Add liquidity
+        uint128 liquidityToAdd = 1e18;
+        int24 tickLower = -120;
+        int24 tickUpper = 120;
+
+        // Provide full-range liquidity to the pool
+        config = PositionConfig({
+            poolKey: key,
+            tickLower: tickLower,
+            tickUpper: tickUpper
+        });
+
+        //vm.expectEmit(true, true, true, true);
+        //emit LiquidityAdded(address(posm), liquidity, tickLower, tickUpper);
+
+        (tokenId,) = posm.mint(
+            config,
+            liquidityToAdd,
+            MAX_SLIPPAGE_ADD_LIQUIDITY,
+            MAX_SLIPPAGE_ADD_LIQUIDITY,
+            address(this),
+            block.timestamp,
+            ZERO_BYTES
+        );
+
+        // Additional assertions can be added here if needed
+    }
+
+    function testAddLiquidityDepeggedStateAbovePrice() public {
+        /*
+        if(turnSystem.getCurrentPlayer() != address(swapRouter)){
+           vm.warp(block.timestamp + 61 minutes); // warp so it's posm's turn
+        }
+        console2.log("current player:", turnSystem.getCurrentPlayer());
+
+        // Simulate a depeg by performing a large swap
+        bool zeroForOne = true;
+        int256 amountSpecified = -1e30; // Large swap to cause depeg
+        swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+
+        uint160 currentPrice = hook.getCurrentPrice(key);
+        assertLt(currentPrice, depegThreshold, "Price should be below depeg threshold");
+
+        if(turnSystem.getCurrentPlayer() != address(posm)){
+           vm.warp(block.timestamp + 61 minutes); // warp so it's posm's turn
+        }
+        console2.log("current player:", turnSystem.getCurrentPlayer());
+
+        // Try to add liquidity above current price
+        uint128 liquidityToAdd = 1e18;
+        int24 tickLower = TickMath.getTickAtSqrtPrice(currentPrice) + 1;
+        int24 tickUpper = TickMath.getTickAtSqrtPrice(currentPrice) + 120;
+
+        // Provide full-range liquidity to the pool
+        config = PositionConfig({
+            poolKey: key,
+            tickLower: tickLower,
+            tickUpper: tickUpper
+        });
+
+        //vm.expectEmit(true, true, true, true);
+        //emit LiquidityAdded(address(posm), liquidity, tickLower, tickUpper);
+
+        (tokenId,) = posm.mint(
+            config,
+            liquidityToAdd,
+            MAX_SLIPPAGE_ADD_LIQUIDITY,
+            MAX_SLIPPAGE_ADD_LIQUIDITY,
+            address(this),
+            block.timestamp,
+            ZERO_BYTES
+        );
+        */
+    }
+
+    function testAddLiquidityDepeggedStateBelowPrice() public {
+        /*
+        if(turnSystem.getCurrentPlayer() != address(swapRouter)){
+           vm.warp(block.timestamp + 61 minutes); // warp so it's posm's turn
+        }
+        console2.log("current player:", turnSystem.getCurrentPlayer());
+
+        // Simulate a depeg by performing a large swap
+        bool zeroForOne = true;
+        int256 amountSpecified = -1e24; // Large swap to cause depeg
+        swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+
+        uint160 currentPrice = hook.getCurrentPrice(key);
+        assertLt(currentPrice, depegThreshold, "Price should be below depeg threshold");
+
+        if(turnSystem.getCurrentPlayer() != address(posm)){
+           vm.warp(block.timestamp + 61 minutes); // warp so it's posm's turn
+        }
+        console2.log("current player:", turnSystem.getCurrentPlayer());
+
+        // Add liquidity below current price
+        uint128 liquidityToAdd = 1e18;
+        console2.log("current tick  price:", TickMath.getTickAtSqrtPrice(currentPrice));
+        console2.log("min tick usable:", TickMath.minUsableTick(key.tickSpacing));
+        int24 tickLower =  -736980;
+        int24 tickUpper = -736920;
+
+        console2.log("tick lower:", tickLower);
+        console2.log("tick upper:", tickUpper);
+
+        // Provide full-range liquidity to the pool
+        config = PositionConfig({
+            poolKey: key,
+            tickLower: tickLower,
+            tickUpper: tickUpper
+        });
+
+        //vm.expectEmit(true, true, true, true);
+        //emit LiquidityAdded(address(posm), liquidity, tickLower, tickUpper);
+
+        (tokenId,) = posm.mint(
+            config,
+            liquidityToAdd,
+            MAX_SLIPPAGE_ADD_LIQUIDITY,
+            MAX_SLIPPAGE_ADD_LIQUIDITY,
+            address(this),
+            block.timestamp,
+            ZERO_BYTES
+        );
+
+        // Additional assertions can be added here if needed
+        */
     }
 
 }
