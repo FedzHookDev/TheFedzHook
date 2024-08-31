@@ -32,15 +32,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     TimeSlotSystem public  timeSlotSystem;
 
 
-    
-
     address public manager;
-
-    struct UserLiquidity{
-        uint128 liquidity;
-        int24 tickLower;
-        int24 tickUpper;
-    }
 
     event DepegThresholdUpdated(uint256 newThreshold);
     event CrisisStateChanged(bool isInCrisis);
@@ -51,6 +43,8 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     event AfterSwapExecuted(address user, bool zeroForOne, int256 amountIn);
     event RewardClaimed(address user, uint256 amount);
     event LiquidityAdded(address indexed sender, uint128 liquidity, int24 tickLower, int24 tickUpper);
+    event LiquidityRemoved(address indexed sender, uint128 liquidity, int24 tickLower, int24 tickUpper);
+    event FeesUpdated(uint24 baseFee, uint24 crisisFee);
 
     event PriceIs(uint256 price); //Test only
     
@@ -71,9 +65,11 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         FUSD = _FUSD;
         depegThreshold = _depegThreshold;
         timeSlotSystem = TimeSlotSystem(_timeSlotSystem);
+        emit DepegThresholdUpdated(_depegThreshold);
 
         baseFee = 3000; // 0.01%
         crisisFee = 6000; // 0.1%
+        emit FeesUpdated(baseFee, crisisFee);
         isInCrisis = false;
     }
 
@@ -97,21 +93,6 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     }
 
 
-    /*
-    function getHooksCalls() public pure override returns (Hooks.Calls memory) {
-        return Hooks.Calls({
-            beforeInitialize: true,
-            afterInitialize: true,
-            beforeModifyPosition: true,
-            afterModifyPosition: true,
-            beforeSwap: true,
-            afterSwap: true,
-            beforeDonate: true,
-            afterDonate: true
-        });
-    }
-    */
-
     modifier _checkPlayerTurn(address player) {
         // If the current player hasn't played, skip their turn
        require(timeSlotSystem.canPlayerAct(player), "Not your turn");
@@ -129,7 +110,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         onlyNFTOwner(sender)
         _checkPlayerTurn(sender)
         override
-
+        view
         
         returns (bytes4)
     {
@@ -159,6 +140,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         _checkPlayerTurn(sender)
         onlyNFTOwner(sender)
         override
+        view
         returns (bytes4)
     {
         
@@ -192,27 +174,11 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         returns (bytes4, BeforeSwapDelta, uint24)
 
     {
-          // Check if it's the sender's turn
-        //require(turnSystem.isPlayerTurn(sender), "Not your turn");
-
-        
-    
-        /* Should not be needed as price checks happens after swap
-        // Get the current sqrt(price) from the pool
-        uint160 currentSqrtPrice = getCurrentPrice(key);
-        emit PriceIs(uint256(currentSqrtPrice));
-
-        // Compare the current sqrt(price) directly with the depegThreshold
-        if (currentSqrtPrice < depegThreshold) {
-            revert("Price is below depeg threshold");
-        }
-        */
         
         uint24 fee = isInCrisis ? crisisFee : baseFee;
         emit BeforeSwapExecuted(sender, params.zeroForOne, params.amountSpecified);
         
-        
-
+    
         return (IHooks.beforeSwap.selector, BeforeSwapDelta.wrap(0), fee);
     }
 
@@ -239,59 +205,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         return (IHooks.afterSwap.selector, 0);
     }
 
-    /*
 
-    function getHookSwapFee(PoolKey calldata) external pure returns (uint24) {
-        return 3000;
-    }
-
-    function getHookWithdrawFee(PoolKey calldata) external pure returns (uint24) {
-        return 6000;
-    }
-
-    function getHookFees(PoolKey calldata key) external view returns (uint24){
-        return 3000;
-    }
-
-    function getFee(address sender, PoolKey calldata key, IPoolManager.SwapParams calldata params, bytes calldata data) external returns (uint24){
-        return 10000;
-    }
-
-    function setDepegThreshold(uint256 newThreshold) external onlyOwner {
-        depegThreshold = newThreshold;
-        emit DepegThresholdUpdated(newThreshold);
-    }
-
-    function setFees(uint24 newBaseFee, uint24 newCrisisFee) external onlyOwner {
-        baseFee = newBaseFee;
-        crisisFee = newCrisisFee;
-    }
-
-    function setCrisisState(bool _isInCrisis) external onlyOwner {
-        isInCrisis = _isInCrisis;
-        emit CrisisStateChanged(_isInCrisis);
-    }
-
-    /*
-    function _storeUserPosition(address user, IPoolManager.ModifyLiquidityParams calldata params) internal{
-        //get user liquidity
-        int24 tickLower = params.tickLower;
-        int24 tickUpper = params.tickUpper;
-
-        PoolKey memory key = _getPoolKey();
-        (uint160 sqrtPriceX96, int24 currentTick, ,  ) = poolManager.getSlot0(key.toId());
-        uint128 userLiquidity = poolManager.getLiquidity(key.toId(),user,  tickLower, tickUpper);
-        
-        userPosition[user] = UserLiquidity(
-            userLiquidity,
-            tickLower,
-            tickUpper
-        );
-        
-
-
-    }
-    */
     
     
 
@@ -309,7 +223,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         (sqrtPriceX96,,,) = poolManager.getSlot0(poolKey.toId());
     }
 
-    function calculatePrice2(uint160 sqrtPriceX96, uint8 token0Decimals, uint8 token1Decimals) public  returns (uint256) {
+    function calculatePriceUint256(uint160 sqrtPriceX96, uint8 token0Decimals, uint8 token1Decimals) public  returns (uint256) {
         uint256 price = uint256(sqrtPriceX96) * uint256(sqrtPriceX96) * (10**token1Decimals) / (2**192) / (10**token0Decimals);
         emit PriceIs(price);
         return price;
@@ -356,6 +270,17 @@ contract FedzHook is BaseHook, NFTWhitelist  {
             address tokenAddress = Currency.unwrap(currency);
             return IERC20Metadata(tokenAddress).decimals();
         }
+    }
+
+    function setDepegThreshold(uint256 _depegThreshold) external onlyOwner {
+        depegThreshold = _depegThreshold;
+        emit DepegThresholdUpdated(_depegThreshold);
+    }
+
+    function updateFees(uint24 _baseFee, uint24 _crisisFee) external onlyOwner {
+        baseFee = _baseFee;
+        crisisFee = _crisisFee;
+        emit FeesUpdated(_baseFee, _crisisFee);
     }
 
 
