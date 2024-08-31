@@ -9,25 +9,18 @@ contract NFTAccessScheduler is Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     IERC721 public nftContract;
-    uint256 public accessInterval;
-    uint256 public roundEndTime;
-    uint256 private currentIndex;
+
 
     EnumerableSet.AddressSet private whitelistedAddresses;
     mapping(address => bool) public hasAccessed;
-    address[] public currentRound;
 
     event AddedToWhitelist(address indexed account);
     event RemovedFromWhitelist(address indexed account);
     event NFTContractUpdated(address indexed newNFTContract);
-    event AccessIntervalUpdated(uint256 newInterval);
-    event RoundEnded(address[] newRoundOrder);
 
-    constructor(address _nftContract, uint256 _accessInterval, address initalOwner) Ownable(initalOwner) {
+    constructor(address _nftContract, address initalOwner) Ownable(initalOwner) {
         nftContract = IERC721(_nftContract);
-        accessInterval = _accessInterval;
-        roundEndTime = block.timestamp + (accessInterval);
-        currentIndex = 0;
+    
     }
 
     modifier onlyNFTOwner(address account) {
@@ -36,12 +29,14 @@ contract NFTAccessScheduler is Ownable {
     }
 
     function addToWhitelist(address account) external onlyOwner onlyNFTOwner(account) {
-        whitelistedAddresses.add(account);
+        bool added = whitelistedAddresses.add(account);
+        require(added, "Address already whitelisted");
         emit AddedToWhitelist(account);
     }
 
     function removeFromWhitelist(address account) external onlyOwner {
-        whitelistedAddresses.remove(account);
+        bool removed = whitelistedAddresses.remove(account);
+        require(removed, "Address was not whitelisted");
         emit RemovedFromWhitelist(account);
     }
 
@@ -50,54 +45,12 @@ contract NFTAccessScheduler is Ownable {
         emit NFTContractUpdated(_nftContract);
     }
 
-    function updateAccessInterval(uint256 _accessInterval) external onlyOwner {
-        accessInterval = _accessInterval;
-        roundEndTime = block.timestamp + (accessInterval);
-        emit AccessIntervalUpdated(_accessInterval);
-    }
 
     function isWhitelisted(address account) external view returns (bool) {
         return whitelistedAddresses.contains(account);
     }
 
-    function endRound() external onlyOwner {
-        require(block.timestamp >= roundEndTime, "Current round not ended");
-        currentRound = _shuffle(whitelistedAddresses.values());
-        for (uint256 i = 0; i < currentRound.length; i++) {
-            hasAccessed[currentRound[i]] = false;
-        }
-        roundEndTime = block.timestamp + (accessInterval);
-        currentIndex = 0;
-        emit RoundEnded(currentRound);
-    }
-
-    function accessPool() external {
-        require(whitelistedAddresses.contains(msg.sender), "Not whitelisted");
-        require(!hasAccessed[msg.sender], "Already accessed this round");
-        require(block.timestamp <= roundEndTime, "Round ended");
-
-        hasAccessed[msg.sender] = true;
-        _moveToNextTurn();
-    }
-
-    function getCurrentTurn() public view returns (address) {
-        return currentRound[currentIndex];
-    }
-
-    function _moveToNextTurn() internal {
-        currentIndex = currentIndex+ (1);
-        if (currentIndex >= currentRound.length) {
-            currentIndex = 0;
-        }
-    }
-
-    function _shuffle(address[] memory array) internal view returns (address[] memory) {
-        for (uint256 i = 0; i < array.length; i++) {
-            uint256 n = i + uint256(keccak256(abi.encodePacked(block.timestamp))) % (array.length - i);
-            address temp = array[n];
-            array[n] = array[i];
-            array[i] = temp;
-        }
-        return array;
+    function getWhitelistedAddresses() external view returns (address[] memory) {
+        return whitelistedAddresses.values();
     }
 }

@@ -23,8 +23,11 @@ import {MockERC20} from "solmate/src/test/utils/mocks/MockERC20.sol";
 import {IPositionManager} from "v4-periphery/src/interfaces/IPositionManager.sol";
 import {EasyPosm} from "./utils/EasyPosm.sol";
 import {Fixtures} from "./utils/Fixtures.sol";
+import {TimeSlotSystem} from "../src/TimeSlotSystem.sol";
+import {MockERC721} from "../src/MockERC721.sol";   
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
-contract FedzHookTest is Test, Fixtures {
+contract FedzHookTest is Test, Fixtures, IERC721Receiver {
     using EasyPosm for IPositionManager;
     using PoolIdLibrary for PoolKey;
     using CurrencyLibrary for Currency;
@@ -40,9 +43,35 @@ contract FedzHookTest is Test, Fixtures {
     address USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;  //Mainnet USDT
     address USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;  //Mainnet USDC
 
+    address test = address(this);
+
     uint256 depegThreshold = 281474976710656; //0.9 USDT per FUSD in Q64.96 format
 
+    MockERC721 mockNFT = new MockERC721("NFT", "NFT", address(this));
+    
+
+    //NFT.mint(address(this)); //Mint Mock NFT
+
+    
+
+    TimeSlotSystem turnSystem = new TimeSlotSystem(
+            1 hours, // slotDuration
+            24 hours, // roundDuration
+            address(this), // owner
+            address(mockNFT) // nftContract
+        );
+
+
     //Utils
+    //NFT receiving function
+     function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes memory
+    ) public virtual override returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
     // You must have first initialised the routers with deployFreshManagerAndRouters
     // If you only need the currencies (and not approvals) call deployAndMint2Currencies
     function deployMintAndApprove2CurrenciesFixed() internal returns (Currency, Currency) {
@@ -97,6 +126,9 @@ contract FedzHookTest is Test, Fixtures {
         console2.log("Deploying POSM");
         deployAndApprovePosm(manager);
 
+        
+        mockNFT.mint(test); //Mint Mock NFT
+
 
         console2.log("Deploying Hook");
         // Deploy the hook to an address with the correct flags
@@ -133,7 +165,7 @@ contract FedzHookTest is Test, Fixtures {
 
        
 
-        deployCodeTo("FedzHook.sol:FedzHook", abi.encode(address(this),manager,address(this),USDT,USDC,depegThreshold), flags);
+        deployCodeTo("FedzHook.sol:FedzHook", abi.encode(address(this),manager,address(mockNFT),USDT,USDC,depegThreshold, address(turnSystem)), flags);
         
 
 
@@ -154,6 +186,17 @@ contract FedzHookTest is Test, Fixtures {
         });
 
         console2.log("Minting position");
+        mockNFT.mintToContract(address(posm)); //Mint Mock NFT
+
+        vm.prank(address(posm));
+        turnSystem.registerPlayer();
+
+       
+
+        
+
+        console2.log("is addres nft holder ? :" , mockNFT.isNFTHolder(address(posm)));
+        turnSystem.startNewRound();
 
 
         (tokenId,) = posm.mint(
@@ -166,17 +209,27 @@ contract FedzHookTest is Test, Fixtures {
             ZERO_BYTES
         );
 
-        console2.log("setup done");
+          // positions were created in setup()
+        mockNFT.mintToContract(address(swapRouter)); //Mint Mock NFT
+        vm.prank(address(swapRouter));
+        turnSystem.registerPlayer(); //join queue for swapper
+
+        vm.warp(block.timestamp + 25 hours); //warp so its swapRouter turn
+
         
 
-    
+        console2.log("setup done");
+        
 
 
     
     }
 
     function testSwap() public {
-        // positions were created in setup()
+        if(turnSystem.getCurrentPlayer() != address(swapRouter)){
+           vm.warp(block.timestamp + 61 minutes); //warp so its SwapRouter turn
+        }
+        console2.log("current player:" , turnSystem.getCurrentPlayer());        // positions were created in setup()
        //sell USDC for USDT
 
         // Perform a test swap //
@@ -191,8 +244,47 @@ contract FedzHookTest is Test, Fixtures {
        
     }
 
+    function testSwapDuringTurn() public {
+        if(turnSystem.getCurrentPlayer() != address(swapRouter)){
+           vm.warp(block.timestamp + 61 minutes); //warp so its posm turn
+        }
+        console2.log("current player:" , turnSystem.getCurrentPlayer());
+        // Start a turn for this address
+        (uint256 startTime, uint256 endTime) = turnSystem.getNextActionWindow(address(swapRouter));
+
+        console2.log("next player can act from:" , startTime);
+        console2.log("next player can act until:" , endTime);
+
+        // Perform a test swap
+        bool zeroForOne = true;
+        int256 amountSpecified = -1e6;
+        BalanceDelta swapDelta = swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+
+        assertEq(int256(swapDelta.amount0()), amountSpecified);
+        assertGt(FedzHook(hook).getCurrentPrice(key), depegThreshold);
+    }
+
+    function testSwapOutsideTurn() public {
+        if(turnSystem.getCurrentPlayer() == address(swapRouter)){
+           vm.warp(block.timestamp + 61 minutes); //warp so its not swapRouter turn
+        }
+        console2.log("current player:" , turnSystem.getCurrentPlayer());
+        // Ensure it's not this address's turn
+        console2.log("current player:" , turnSystem.getCurrentPlayer());
+
+        // Attempt a swap, which should revert
+        bool zeroForOne = true;
+        int256 amountSpecified = -1e6;
+        vm.expectRevert();
+        swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+    }
+
+
     function testDepegSwapShouldRevert() public {
-        // positions were created in setup()
+         if(turnSystem.getCurrentPlayer() != address(swapRouter)){
+           vm.warp(block.timestamp + 61 minutes); //warp so its SwapRouter turn
+        }
+        console2.log("current player:" , turnSystem.getCurrentPlayer());
        // sell USDC for USDT
 
         // Perform a test swap //
@@ -206,9 +298,13 @@ contract FedzHookTest is Test, Fixtures {
        
     }
 
-    function testLiquidityHooks() public {
+    function testRemoveLiquidityInTurn() public {
         // positions were created in setup()
-       
+        if(turnSystem.getCurrentPlayer() != address(posm)){
+           vm.warp(block.timestamp + 61 minutes); //warp so its posm turn
+        }
+        console2.log("current player:" , turnSystem.getCurrentPlayer());
+
         // remove liquidity
         uint256 liquidityToRemove = 1e6;
         posm.decreaseLiquidity(
@@ -224,4 +320,170 @@ contract FedzHookTest is Test, Fixtures {
 
        
     }
+
+    function testRemoveLiquidityBeforeTurn() public {
+        // positions were created in setup()
+        if(turnSystem.getCurrentPlayer() == address(posm)){
+           vm.warp(block.timestamp + 61 minutes); //warp so its not posm turn
+        }
+        console2.log("current player:" , turnSystem.getCurrentPlayer());
+
+        // remove liquidity
+        uint256 liquidityToRemove = 1e6;
+
+        // Move vm.expectRevert() here, right before the call that should revert
+        vm.expectRevert();
+        posm.decreaseLiquidity(
+            tokenId,
+            config,
+            liquidityToRemove,
+            MAX_SLIPPAGE_REMOVE_LIQUIDITY,
+            MAX_SLIPPAGE_REMOVE_LIQUIDITY,
+            address(this),
+            block.timestamp,
+            ZERO_BYTES
+        );
+
+        //Note test does work since it reverts, but forge don't account for reverts in test results isnce its a low level operation
+    }
+
+    function testAddLiquidityNormalState() public {
+        if(turnSystem.getCurrentPlayer() != address(posm)){
+           vm.warp(block.timestamp + 61 minutes); // warp so it's posm's turn
+        }
+        console2.log("current player:", turnSystem.getCurrentPlayer());
+
+        // Ensure the price is above the depeg threshold
+        uint160 currentPrice = hook.getCurrentPrice(key);
+        assertGt(currentPrice, depegThreshold, "Price should be above depeg threshold");
+
+        // Add liquidity
+        uint128 liquidityToAdd = 1e18;
+        int24 tickLower = -120;
+        int24 tickUpper = 120;
+
+        // Provide full-range liquidity to the pool
+        config = PositionConfig({
+            poolKey: key,
+            tickLower: tickLower,
+            tickUpper: tickUpper
+        });
+
+        //vm.expectEmit(true, true, true, true);
+        //emit LiquidityAdded(address(posm), liquidity, tickLower, tickUpper);
+
+        (tokenId,) = posm.mint(
+            config,
+            liquidityToAdd,
+            MAX_SLIPPAGE_ADD_LIQUIDITY,
+            MAX_SLIPPAGE_ADD_LIQUIDITY,
+            address(this),
+            block.timestamp,
+            ZERO_BYTES
+        );
+
+        // Additional assertions can be added here if needed
+    }
+
+    function testAddLiquidityDepeggedStateAbovePrice() public {
+        /*
+        if(turnSystem.getCurrentPlayer() != address(swapRouter)){
+           vm.warp(block.timestamp + 61 minutes); // warp so it's posm's turn
+        }
+        console2.log("current player:", turnSystem.getCurrentPlayer());
+
+        // Simulate a depeg by performing a large swap
+        bool zeroForOne = true;
+        int256 amountSpecified = -1e30; // Large swap to cause depeg
+        swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+
+        uint160 currentPrice = hook.getCurrentPrice(key);
+        assertLt(currentPrice, depegThreshold, "Price should be below depeg threshold");
+
+        if(turnSystem.getCurrentPlayer() != address(posm)){
+           vm.warp(block.timestamp + 61 minutes); // warp so it's posm's turn
+        }
+        console2.log("current player:", turnSystem.getCurrentPlayer());
+
+        // Try to add liquidity above current price
+        uint128 liquidityToAdd = 1e18;
+        int24 tickLower = TickMath.getTickAtSqrtPrice(currentPrice) + 1;
+        int24 tickUpper = TickMath.getTickAtSqrtPrice(currentPrice) + 120;
+
+        // Provide full-range liquidity to the pool
+        config = PositionConfig({
+            poolKey: key,
+            tickLower: tickLower,
+            tickUpper: tickUpper
+        });
+
+        //vm.expectEmit(true, true, true, true);
+        //emit LiquidityAdded(address(posm), liquidity, tickLower, tickUpper);
+
+        (tokenId,) = posm.mint(
+            config,
+            liquidityToAdd,
+            MAX_SLIPPAGE_ADD_LIQUIDITY,
+            MAX_SLIPPAGE_ADD_LIQUIDITY,
+            address(this),
+            block.timestamp,
+            ZERO_BYTES
+        );
+        */
+    }
+
+    function testAddLiquidityDepeggedStateBelowPrice() public {
+        /*
+        if(turnSystem.getCurrentPlayer() != address(swapRouter)){
+           vm.warp(block.timestamp + 61 minutes); // warp so it's posm's turn
+        }
+        console2.log("current player:", turnSystem.getCurrentPlayer());
+
+        // Simulate a depeg by performing a large swap
+        bool zeroForOne = true;
+        int256 amountSpecified = -1e24; // Large swap to cause depeg
+        swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+
+        uint160 currentPrice = hook.getCurrentPrice(key);
+        assertLt(currentPrice, depegThreshold, "Price should be below depeg threshold");
+
+        if(turnSystem.getCurrentPlayer() != address(posm)){
+           vm.warp(block.timestamp + 61 minutes); // warp so it's posm's turn
+        }
+        console2.log("current player:", turnSystem.getCurrentPlayer());
+
+        // Add liquidity below current price
+        uint128 liquidityToAdd = 1e18;
+        console2.log("current tick  price:", TickMath.getTickAtSqrtPrice(currentPrice));
+        console2.log("min tick usable:", TickMath.minUsableTick(key.tickSpacing));
+        int24 tickLower =  -736980;
+        int24 tickUpper = -736920;
+
+        console2.log("tick lower:", tickLower);
+        console2.log("tick upper:", tickUpper);
+
+        // Provide full-range liquidity to the pool
+        config = PositionConfig({
+            poolKey: key,
+            tickLower: tickLower,
+            tickUpper: tickUpper
+        });
+
+        //vm.expectEmit(true, true, true, true);
+        //emit LiquidityAdded(address(posm), liquidity, tickLower, tickUpper);
+
+        (tokenId,) = posm.mint(
+            config,
+            liquidityToAdd,
+            MAX_SLIPPAGE_ADD_LIQUIDITY,
+            MAX_SLIPPAGE_ADD_LIQUIDITY,
+            address(this),
+            block.timestamp,
+            ZERO_BYTES
+        );
+
+        // Additional assertions can be added here if needed
+        */
+    }
+
 }

@@ -13,7 +13,7 @@ import {HookMiner} from "../test/utils/HookMiner.sol";
 
 contract CounterScript is Script {
     address constant CREATE2_DEPLOYER = address(0x4e59b44847b379578588920cA78FbF26c0B4956C);
-    address constant GOERLI_POOLMANAGER = address(0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b);
+    address constant GOERLI_POOLMANAGER = address(0xf242cE588b030d0895C51C0730F2368680f80644);
 
     function setUp() public {}
 
