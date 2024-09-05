@@ -131,4 +131,8 @@ contract TimeSlotSystem is Ownable {
     function setRoundDuration(uint256 _roundDuration) external onlyOwner {
         roundDuration = _roundDuration;
     }
+
+    function setNFTContract(address _nftContract) external onlyOwner {
+        nftContract = IERC721(_nftContract);
+    }
 }
