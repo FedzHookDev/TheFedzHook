@@ -37,9 +37,7 @@ contract TheFedzHookScript is Script {
         );
         
 
-        // Mine a salt that will produce a hook address with the correct flags
-        (address hookAddress, bytes32 salt) =
-            HookMiner.find(CREATE2_DEPLOYER, flags, type(FedzHook).creationCode, abi.encode(owner,address(SEPOLIA_POOLMANAGER),owner,MOCK_USDT,MOCK_FUSD,depegThreshold));
+        
 
         // Deploy the hook using CREATE2
         // Start broadcasting transactions
@@ -52,6 +50,10 @@ contract TheFedzHookScript is Script {
             owner, // owner
             address(mockNFT) // nftContract
         );
+
+        // Mine a salt that will produce a hook address with the correct flags
+        (address hookAddress, bytes32 salt) =
+            HookMiner.find(CREATE2_DEPLOYER, flags, type(FedzHook).creationCode, abi.encode(owner,address(SEPOLIA_POOLMANAGER),owner,MOCK_USDT,MOCK_FUSD,depegThreshold, address(timeSlotSystem)));
 
         FedzHook TheFedzHook = new FedzHook{salt: salt}(owner, IPoolManager(address(SEPOLIA_POOLMANAGER)),owner,MOCK_USDT,MOCK_FUSD,depegThreshold, address(timeSlotSystem));
         require(address(TheFedzHook) == hookAddress, "FedzHookScript: hook address mismatch");

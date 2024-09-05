@@ -17,7 +17,7 @@ contract AddLiquidityScript is Script {
     address constant SEPOLIA_POOLMANAGER = address(0xf242cE588b030d0895C51C0730F2368680f80644); //sepolia pool manager deployed to GOERLI
     address constant MFUSD_ADDRESS = address(0xc7c06a77b481869ecc57E5432D03c3661406424D); //mUNI deployed to GOERLI -- insert your own contract address here
     address constant MUSDT_ADDRESS = address(0x0f1D1b7abAeC1Df25f2C4Db751686FC5233f6D3f); //mUSDC deployed to GOERLI -- insert your own contract address here
-    address constant HOOK_ADDRESS = address(0x4C3bb7E3eb22a1AED4f16D87A3427034E394cAc0); //address of the hook contract deployed to goerli -- you can use this hook address or deploy your own!
+    address constant HOOK_ADDRESS = address(0x854d0410137EE2f307C72fea4A7d176223950ac0); //address of the hook contract deployed to goerli -- you can use this hook address or deploy your own!
 
     PoolModifyLiquidityTest lpRouter = PoolModifyLiquidityTest(address(0x39BF2eFF94201cfAA471932655404F63315147a4));
 
@@ -39,8 +39,8 @@ contract AddLiquidityScript is Script {
             hooks: IHooks(HOOK_ADDRESS)
         });
 
-        uint256 provideToken0 = 1000e18;
-        uint256 provideToken1 = 1000e18;
+        uint256 provideToken0 = 100000e18;
+        uint256 provideToken1 = 100000e18;
 
         // approve tokens to the LP Router
         vm.startBroadcast(deployerPrivateKey);
@@ -57,7 +57,7 @@ contract AddLiquidityScript is Script {
         console.logBytes32(bytes32(idBytes));
 
         // Provide 10_000e18 worth of liquidity on the range of [-600, 600]
-        lpRouter.modifyLiquidity(pool, IPoolManager.ModifyLiquidityParams(-600, 600, 10_000e18, 0), hookData);
+        lpRouter.modifyLiquidity(pool, IPoolManager.ModifyLiquidityParams(-600, 600, 10_00000e18, 0), hookData);
 
         vm.stopBroadcast();
 

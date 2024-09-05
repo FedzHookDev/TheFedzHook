@@ -14,13 +14,16 @@ contract NFTWhitelist is Ownable {
     event AddedToWhitelist(address indexed account);
     event RemovedFromWhitelist(address indexed account);
     event NFTContractUpdated(address indexed newNFTContract);
+    error NotNftHolder(address account);
 
     constructor(address _nftContract, address initalOwner) Ownable(initalOwner) {
         nftContract = IERC721(_nftContract);
     }
 
     modifier onlyNFTOwner(address account) {
-        require(nftContract.balanceOf(account) > 0, "Not an NFT holder");
+        if(!(nftContract.balanceOf(account) > 0)){
+            revert NotNftHolder(account);
+        }
         _;
     }
 

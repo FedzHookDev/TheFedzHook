@@ -187,6 +187,14 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
 
         console2.log("Minting position");
         mockNFT.mintToContract(address(posm)); //Mint Mock NFT
+        mockNFT.mintToContract(address(msg.sender)); //Mint Mock NFT
+        mockNFT.mintToContract(address(manager)); //Mint Mock NFT
+
+        vm.prank(address(manager));
+        turnSystem.registerPlayer();
+
+        vm.prank(address(msg.sender));
+        turnSystem.registerPlayer();
 
         vm.prank(address(posm));
         turnSystem.registerPlayer();
@@ -198,6 +206,9 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
         console2.log("is addres nft holder ? :" , mockNFT.isNFTHolder(address(posm)));
         turnSystem.startNewRound();
 
+        console2.log("msg sender:", msg.sender);
+        console2.log("manager address:", address(manager));
+        console2.log("is addres nft holder ? :" , mockNFT.isNFTHolder(address(manager)));
 
         (tokenId,) = posm.mint(
             config,

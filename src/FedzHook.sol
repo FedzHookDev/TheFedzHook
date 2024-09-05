@@ -107,8 +107,8 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         bytes calldata // data
     )
         external
-        onlyNFTOwner(sender)
-        _checkPlayerTurn(sender)
+        onlyNFTOwner(msg.sender)
+        _checkPlayerTurn(msg.sender)
         override
         view
         
@@ -137,8 +137,8 @@ contract FedzHook is BaseHook, NFTWhitelist  {
 
     )
         external
-        _checkPlayerTurn(sender)
-        onlyNFTOwner(sender)
+        _checkPlayerTurn(msg.sender)
+        onlyNFTOwner(msg.sender)
         override
         view
         returns (bytes4)
@@ -167,8 +167,8 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         bytes calldata // data
     )
         external
-        _checkPlayerTurn(sender)
-        onlyNFTOwner(sender)
+        _checkPlayerTurn(msg.sender)
+        onlyNFTOwner(msg.sender)
         override
 
         returns (bytes4, BeforeSwapDelta, uint24)
@@ -190,6 +190,8 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         bytes calldata // data
     )
         external
+        _checkPlayerTurn(msg.sender)
+        onlyNFTOwner(msg.sender)
         override
         returns (bytes4, int128)
     {
@@ -281,6 +283,10 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         baseFee = _baseFee;
         crisisFee = _crisisFee;
         emit FeesUpdated(_baseFee, _crisisFee);
+    }
+
+    function updateTimeSlotSystem(address _timeSlotSystem) external onlyOwner {
+        timeSlotSystem = TimeSlotSystem(_timeSlotSystem);
     }
 
 
