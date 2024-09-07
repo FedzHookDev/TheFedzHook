@@ -27,6 +27,10 @@ contract NFTWhitelist is Ownable {
         _;
     }
 
+    function isNftHolder(address account) public view returns (bool) {
+        return nftContract.balanceOf(account) > 0;
+    }
+
     function addToWhitelist(address account) external onlyOwner onlyNFTOwner(account) {
         whitelistedAddresses.add(account);
         emit AddedToWhitelist(account);
