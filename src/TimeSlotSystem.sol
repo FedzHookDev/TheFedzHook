@@ -50,6 +50,14 @@ contract TimeSlotSystem is Ownable {
         emit PlayerRegistered(msg.sender);
     }
 
+    function registerPlayer(address player) external onlyOwner {
+        require(!players[player].isRegistered, "Player already registered");
+        players[player] = Player(true, playerCount);
+        playerList.push(player);
+        playerCount++;
+        emit PlayerRegistered(player);
+    }
+
     function unregisterPlayer() external onlyNFTOwner(msg.sender){
         require(players[msg.sender].isRegistered, "Player not registered");
         uint256 indexToRemove = players[msg.sender].index;
@@ -63,6 +71,22 @@ contract TimeSlotSystem is Ownable {
         playerCount--;
         
         emit PlayerUnregistered(msg.sender);
+    }
+
+    function unregisterPlayer(address player) external onlyOwner {
+        require(players[player].isRegistered, "Player not registered");
+        uint256 indexToRemove = players[player].index;
+        address lastPlayer = playerList[playerCount - 1];
+
+        playerList[indexToRemove] = lastPlayer;
+        players[lastPlayer].index = indexToRemove;
+
+        playerList.pop();
+        delete players[player];
+        playerCount--;
+        
+        emit PlayerUnregistered(player);
+
     }
 
     function startNewRound() external {
