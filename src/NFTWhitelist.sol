@@ -53,4 +53,6 @@ contract NFTWhitelist is Ownable {
     function getWhitelistedAddresses() external view returns (address[] memory) {
         return whitelistedAddresses.values();
     }
+
+     
 }

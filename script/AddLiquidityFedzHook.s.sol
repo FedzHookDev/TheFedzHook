@@ -17,7 +17,7 @@ contract AddLiquidityScript is Script {
     address constant SEPOLIA_POOLMANAGER = address(0xf242cE588b030d0895C51C0730F2368680f80644); //sepolia pool manager deployed to GOERLI
     address constant MFUSD_ADDRESS = address(0xc7c06a77b481869ecc57E5432D03c3661406424D); //mUNI deployed to GOERLI -- insert your own contract address here
     address constant MUSDT_ADDRESS = address(0x0f1D1b7abAeC1Df25f2C4Db751686FC5233f6D3f); //mUSDC deployed to GOERLI -- insert your own contract address here
-    address constant HOOK_ADDRESS = address(0x854d0410137EE2f307C72fea4A7d176223950ac0); //address of the hook contract deployed to goerli -- you can use this hook address or deploy your own!
+    address constant HOOK_ADDRESS = address(0x4E4a9A0C097427A4A72B1386A031fd411adf8aC0); //address of the hook contract deployed to goerli -- you can use this hook address or deploy your own!
 
     PoolModifyLiquidityTest lpRouter = PoolModifyLiquidityTest(address(0x39BF2eFF94201cfAA471932655404F63315147a4));
 
