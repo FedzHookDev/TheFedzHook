@@ -5,11 +5,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {MockERC721} from "./MockERC721.sol";
 
-
 contract TimeSlotSystem is Ownable {
     struct Player {
         bool isRegistered;
         uint256 slots;
+        uint256[] actionWindows;
     }
 
     uint256 public slotDuration;
@@ -18,12 +18,9 @@ contract TimeSlotSystem is Ownable {
     uint256 public totalSlots;
     uint256 public currentRoundNumber;
 
-
     MockERC721 public nftContract;
 
     mapping(address => Player) public players;
-    // New mapping to store randomized slot order
-    mapping(address => uint256[]) private playerSlotOrder;
     address[] public playerList;
 
     uint256 private nonce;
@@ -31,7 +28,7 @@ contract TimeSlotSystem is Ownable {
     event NewRoundStarted(uint256 startTime);
     event PlayerRegistered(address player, uint256 slots);
     event PlayerUnregistered(address player);
-    event PlayerOrderShuffled();
+    event SlotsShuffled();
     event RoundEnded(uint256 endTime, uint256 roundNumber);
 
     modifier onlyNFTOwner(address account) {
@@ -65,12 +62,12 @@ contract TimeSlotSystem is Ownable {
                 totalSlots += balance;
                 emit PlayerRegistered(owner, balance);
             } else if (players[owner].isRegistered) {
-                emit PlayerUnregistered(owner); // Player has no NFTs anymore
+                unregisterPlayer(owner);
             }
         }
     }
 
-     function unregisterPlayer(address player) external onlyOwner() {
+    function unregisterPlayer(address player) public {
         require(players[player].isRegistered, "Player not registered");
         totalSlots -= players[player].slots;
         delete players[player];
@@ -85,9 +82,8 @@ contract TimeSlotSystem is Ownable {
         
         emit PlayerUnregistered(player);
     }
-    
 
-     function startNewRound() public {
+    function startNewRound() public {
         require(totalSlots > 0, "No players registered");
         require(roundStartTime == 0 || block.timestamp >= roundStartTime + roundDuration, "Current round not finished");
         
@@ -98,69 +94,62 @@ contract TimeSlotSystem is Ownable {
         updatePlayerSlots();
         roundStartTime = block.timestamp;
         currentRoundNumber++;
-        shufflePlayers();
+        shuffleSlots();
         emit NewRoundStarted(roundStartTime);
     }
-    
 
-    function shufflePlayers() private {
-        // Shuffle player order
-        for (uint256 i = playerList.length - 1; i > 0; i--) {
-            uint256 j = uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, nonce))) % (i + 1);
-            nonce++;
-
-            address temp = playerList[i];
-            playerList[i] = playerList[j];
-            playerList[j] = temp;
+    function shuffleSlots() private {
+        uint256[] memory allSlots = new uint256[](totalSlots);
+        for (uint256 i = 0; i < totalSlots; i++) {
+            allSlots[i] = i;
         }
 
-        // Randomize slot order for each player
+        // Fisher-Yates shuffle
+        for (uint256 i = totalSlots - 1; i > 0; i--) {
+            uint256 j = uint256(keccak256(abi.encodePacked(block.timestamp, nonce))) % (i + 1);
+            nonce++;
+
+            uint256 temp = allSlots[i];
+            allSlots[i] = allSlots[j];
+            allSlots[j] = temp;
+        }
+
+        uint256 slotIndex = 0;
         for (uint256 i = 0; i < playerList.length; i++) {
             address player = playerList[i];
             uint256 playerSlots = players[player].slots;
-            
-            // Create an array of slot indices
-            uint256[] memory slotIndices = new uint256[](playerSlots);
+            delete players[player].actionWindows; // Clear existing action windows
+            players[player].actionWindows = new uint256[](playerSlots);
+
             for (uint256 j = 0; j < playerSlots; j++) {
-                slotIndices[j] = j;
+                players[player].actionWindows[j] = allSlots[slotIndex];
+                slotIndex++;
             }
-
-            // Shuffle the slot indices
-            for (uint256 j = playerSlots - 1; j > 0; j--) {
-                uint256 k = uint256(keccak256(abi.encodePacked(block.timestamp, player, nonce))) % (j + 1);
-                nonce++;
-
-                uint256 temp = slotIndices[j];
-                slotIndices[j] = slotIndices[k];
-                slotIndices[k] = temp;
-            }
-
-            // Store the shuffled slot order
-            playerSlotOrder[player] = slotIndices;
         }
 
-        emit PlayerOrderShuffled();
+        emit SlotsShuffled();
     }
 
 
-      function getCurrentPlayer() public view returns (address) {
+    function getCurrentPlayer() public view returns (address) {
         require(roundStartTime > 0, "No active round");
+        require(block.timestamp >= roundStartTime, "Round has not started");
         require(block.timestamp < roundStartTime + roundDuration, "Round has ended");
-        uint256 elapsedTime = (block.timestamp - roundStartTime);
-        uint256 currentSlot = (elapsedTime / slotDuration) % totalSlots;
-        
-        uint256 accumulatedSlots = 0;
+
+        uint256 currentSlot = (block.timestamp - roundStartTime) / slotDuration;
+
         for (uint256 i = 0; i < playerList.length; i++) {
             address player = playerList[i];
-            uint256 playerSlots = players[player].slots;
-            for (uint256 j = 0; j < playerSlots; j++) {
-                if (currentSlot == accumulatedSlots + playerSlotOrder[player][j]) {
-                    return player;
+            if (players[player].isRegistered) {
+                for (uint256 j = 0; j < players[player].actionWindows.length; j++) {
+                    if (players[player].actionWindows[j] == currentSlot) {
+                        return player;
+                    }
                 }
             }
-            accumulatedSlots += playerSlots;
         }
-        revert("No player found for current slot");
+
+        revert("No player found for current time");
     }
 
     function canPlayerAct(address player) public view returns (bool) {
@@ -172,34 +161,26 @@ contract TimeSlotSystem is Ownable {
     }
 
     function getNextActionWindow(address player) public view returns (uint256 startTime, uint256 endTime) {
-    require(roundStartTime > 0, "No active round");
-    require(players[player].isRegistered, "Player not registered");
+        require(roundStartTime > 0, "No active round");
+        require(players[player].isRegistered, "Player not registered");
 
-    uint256 currentRoundTime = (block.timestamp - roundStartTime);
-    uint256 currentSlot = (currentRoundTime / slotDuration) % totalSlots;
-    
-    uint256 accumulatedSlots = 0;
-    for (uint256 i = 0; i < playerList.length; i++) {
-        address currentPlayer = playerList[i];
-        for (uint256 j = 0; j < players[currentPlayer].slots; j++) {
-            if (currentPlayer == player && currentSlot <= accumulatedSlots) {
-                startTime = roundStartTime + (accumulatedSlots * slotDuration);
-                if (startTime < block.timestamp) {
-                    startTime += roundDuration;
-                }
+        uint256 currentSlot = (block.timestamp - roundStartTime) / slotDuration;
+
+        for (uint256 i = 0; i < players[player].actionWindows.length; i++) {
+            if (players[player].actionWindows[i] > currentSlot) {
+                startTime = roundStartTime + (players[player].actionWindows[i] * slotDuration);
                 endTime = startTime + slotDuration;
                 if (endTime > roundStartTime + roundDuration) {
                     endTime = roundStartTime + roundDuration;
                 }
                 return (startTime, endTime);
             }
-            accumulatedSlots++;
         }
-    }
-    revert("No upcoming action window found for player");
-}
 
-function getAllActionWindows(address player) public view returns (uint256[] memory startTimes, uint256[] memory endTimes) {
+        revert("No upcoming action window found for player");
+    }
+
+    function getAllActionWindows(address player) public view returns (uint256[] memory startTimes, uint256[] memory endTimes) {
         require(roundStartTime > 0, "No active round");
         require(players[player].isRegistered, "Player not registered");
 
@@ -207,26 +188,16 @@ function getAllActionWindows(address player) public view returns (uint256[] memo
         startTimes = new uint256[](playerSlots);
         endTimes = new uint256[](playerSlots);
 
-        uint256 accumulatedSlots = 0;
-        for (uint256 i = 0; i < playerList.length; i++) {
-            address currentPlayer = playerList[i];
-            if (currentPlayer == player) {
-                for (uint256 j = 0; j < playerSlots; j++) {
-                    uint256 slotIndex = accumulatedSlots + playerSlotOrder[player][j];
-                    startTimes[j] = roundStartTime + (slotIndex * slotDuration);
-                    endTimes[j] = startTimes[j] + slotDuration;
-                    if (endTimes[j] > roundStartTime + roundDuration) {
-                        endTimes[j] = roundStartTime + roundDuration;
-                    }
-                }
-                break;
+        for (uint256 i = 0; i < playerSlots; i++) {
+            startTimes[i] = roundStartTime + (players[player].actionWindows[i] * slotDuration);
+            endTimes[i] = startTimes[i] + slotDuration;
+            if (endTimes[i] > roundStartTime + roundDuration) {
+                endTimes[i] = roundStartTime + roundDuration;
             }
-            accumulatedSlots += players[currentPlayer].slots;
         }
     }
 
-
-     function isRoundActive() public view returns (bool) {
+    function isRoundActive() public view returns (bool) {
         return roundStartTime > 0 && block.timestamp < roundStartTime + roundDuration;
     }
 
@@ -236,7 +207,7 @@ function getAllActionWindows(address player) public view returns (uint256[] memo
         }
         return (roundStartTime + roundDuration) - block.timestamp;
     }
-    
+
 
     function setSlotDuration(uint256 _slotDuration) external onlyOwner {
         slotDuration = _slotDuration;
