@@ -42,7 +42,7 @@ contract TheFedzHookScript is Script {
         // Deploy the hook using CREATE2
         // Start broadcasting transactions
         vm.startBroadcast(deployerPrivateKey);
-        MockERC721 mockNFT = new MockERC721("Fedz Mock NFT" , "Fedz Mock NFT", owner);
+        MockERC721 mockNFT = new MockERC721("Fedz Mock NFT" , "Fedz Mock NFT", owner, 'https://fedzfrontend-loris-epfl-loris-epfls-projects.vercel.app/NftPictures/nft_');
 
         TimeSlotSystem timeSlotSystem = new TimeSlotSystem(
             1 hours, // slotDuration

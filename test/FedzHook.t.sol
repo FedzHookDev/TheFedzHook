@@ -47,7 +47,7 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
 
     uint256 depegThreshold = 281474976710656; //0.9 USDT per FUSD in Q64.96 format
 
-    MockERC721 mockNFT = new MockERC721("NFT", "NFT", address(this));
+    MockERC721 mockNFT = new MockERC721("NFT", "NFT", address(this), 'https://fedzfrontend-loris-epfl-loris-epfls-projects.vercel.app/NftPictures/nft_');
     
 
     //NFT.mint(address(this)); //Mint Mock NFT
@@ -225,7 +225,7 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
           // positions were created in setup()
         mockNFT.mintToContract(address(swapRouter)); //Mint Mock NFT
         vm.prank(address(swapRouter));
-        turnSystem.registerPlayer(); //join queue for swapper
+        //turnSystem.registerPlayer(); //join queue for swapper
 
         vm.warp(block.timestamp + 25 hours); //warp so its swapRouter turn
 

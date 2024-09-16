@@ -54,7 +54,7 @@ contract FedzHookTestCustomRouter is Test, IERC721Receiver {
 
     function setUp() public {
         // Deploy mock contracts
-        mockNFT = new MockERC721("NFT", "NFT", address(this));
+        mockNFT = new MockERC721("NFT", "NFT", address(this), 'https://fedzfrontend-loris-epfl-loris-epfls-projects.vercel.app/NftPictures/nft_');
         turnSystem = new TimeSlotSystem(1 hours, 24 hours, address(this), address(mockNFT));
 
         // Deploy the PoolManager
@@ -111,11 +111,11 @@ contract FedzHookTestCustomRouter is Test, IERC721Receiver {
         mockNFT.mintToContract(address(modifyLiquidityRouter));
 
         vm.prank(address(modifyLiquidityRouter));
-        turnSystem.registerPlayer();
+        //turnSystem.registerPlayer();
 
-        turnSystem.registerPlayer();
+        //turnSystem.registerPlayer();
         vm.prank(address(swapRouter));
-        turnSystem.registerPlayer();
+        //turnSystem.registerPlayer();
 
         
 

@@ -13,6 +13,12 @@ contract MockERC721 is ERC721, Ownable {
     // Mapping from owner address to list of owned token IDs
     mapping(address => uint256[]) private _ownedTokens;
 
+    // Array to store all unique NFT owner addresses
+    address[] private _allOwners;
+
+    // Mapping to check if an address is already in _allOwners
+    mapping(address => bool) private _isOwner;
+
     // Base URI for computing {tokenURI}
     string private _baseTokenURI;
 
@@ -27,6 +33,7 @@ contract MockERC721 is ERC721, Ownable {
     function mint(address to) public onlyOwner returns (uint256) {
         uint256 tokenId = _nextTokenId;
         _safeMint(to, tokenId);
+        _addOwner(to);
         _ownedTokens[to].push(tokenId);
         _nextTokenId++;
         return tokenId;
@@ -35,6 +42,7 @@ contract MockERC721 is ERC721, Ownable {
     function mintToContract(address to) public onlyOwner returns (uint256) {
         uint256 tokenId = _nextTokenId;
         _mint(to, tokenId);
+        _addOwner(to);
         _ownedTokens[to].push(tokenId);
         _nextTokenId++;
         return tokenId;
@@ -50,15 +58,30 @@ contract MockERC721 is ERC721, Ownable {
         return _ownedTokens[owner];
     }
 
-    // Override transfer functions to update _ownedTokens
-    function _transfer(address from, address to, uint256 tokenId) internal override {
-        super._transfer(from, to, tokenId);
-        
+    // Function to get all unique NFT owner addresses
+    function getAllOwners() public view returns (address[] memory) {
+        return _allOwners;
+    }
+
+
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes memory data) public virtual override {
+        super.safeTransferFrom(from, to, tokenId, data);
+        _updateOwnedTokens(from, to, tokenId);
+    }
+
+  
+
+    // Internal function to update _ownedTokens and _allOwners
+    function _updateOwnedTokens(address from, address to, uint256 tokenId) internal {
         // Remove tokenId from previous owner's list
         _removeTokenFromOwnerEnumeration(from, tokenId);
 
         // Add tokenId to new owner's list
         _ownedTokens[to].push(tokenId);
+
+        // Update _allOwners
+        _removeOwner(from);
+        _addOwner(to);
     }
 
     // Helper function to remove a token from an owner's list
@@ -84,6 +107,28 @@ contract MockERC721 is ERC721, Ownable {
         fromTokens.pop();
     }
 
+    // Helper function to add an owner to _allOwners
+    function _addOwner(address owner) private {
+        if (!_isOwner[owner] && balanceOf(owner) > 0) {
+            _allOwners.push(owner);
+            _isOwner[owner] = true;
+        }
+    }
+
+    // Helper function to remove an owner from _allOwners
+    function _removeOwner(address owner) private {
+        if (_isOwner[owner] && balanceOf(owner) == 0) {
+            for (uint256 i = 0; i < _allOwners.length; i++) {
+                if (_allOwners[i] == owner) {
+                    _allOwners[i] = _allOwners[_allOwners.length - 1];
+                    _allOwners.pop();
+                    break;
+                }
+            }
+            _isOwner[owner] = false;
+        }
+    }
+
     // Override _baseURI() to return the base URI for computing {tokenURI}
     function _baseURI() internal view override returns (string memory) {
         return _baseTokenURI;
@@ -91,9 +136,8 @@ contract MockERC721 is ERC721, Ownable {
 
     // Override tokenURI to return the full URI for a given token ID
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-
         string memory baseURI = _baseURI();
-        return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, tokenId.toString())) : "";
+        return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, tokenId.toString(), '.webp')) : "";
     }
 
     // Function to set the base URI
@@ -101,9 +145,8 @@ contract MockERC721 is ERC721, Ownable {
         _baseTokenURI = baseURI;
     }
 
-    // Added function to get the next token ID (useful for testing)
+    // Added function to get the next token ID (
     function getNextTokenId() public view returns (uint256) {
         return _nextTokenId;
     }
-
 }
