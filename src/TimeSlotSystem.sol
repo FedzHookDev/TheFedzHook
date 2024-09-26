@@ -152,6 +152,14 @@ contract TimeSlotSystem is Ownable {
         revert("No player found for current time");
     }
 
+    function isPlayerActive(address player) public view returns (bool) {
+        if(!(roundStartTime > 0) || !(block.timestamp < roundStartTime + roundDuration) || !(players[player].isRegistered)) {
+            return false;
+        }
+       
+        return getCurrentPlayer() == player;
+    }
+
     function canPlayerAct(address player) public view returns (bool) {
         require(roundStartTime > 0, "No active round");
         require(block.timestamp < roundStartTime + roundDuration, "Round has ended");

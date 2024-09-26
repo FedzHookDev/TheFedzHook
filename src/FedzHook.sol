@@ -112,12 +112,13 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     }
 
     modifier _validateHookData(bytes calldata data) {
+        require(data.length > 0, "No data provided");
         (address actualSender, bytes memory actualData) = abi.decode(data, (address, bytes));
         
         if (!isNftHolder(actualSender)) {
             revert NotNftHolder(actualSender);
         }
-        if (!timeSlotSystem.canPlayerAct(actualSender)) {
+        if (!timeSlotSystem.isPlayerActive(actualSender)) {
             revert NotPlayerTurn(actualSender);
         }
         _;
@@ -131,13 +132,13 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     )
         external
         //checkIsCustomRouter(sender)
-        //_validateHookData(data)
+        _validateHookData(data)
         override
         view
         
         returns (bytes4)
     {
-        /*
+        
         
         // Get the current sqrt(price) from the pool
         uint160 currentSqrtPrice = getCurrentPrice(key);
@@ -147,7 +148,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
             revert("When depegged, can only add liquidity below current price");
         }
 
-        */
+        
         
 
 
@@ -163,7 +164,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     )
         external
         //_checkIsCustomRouter(sender)
-        //_validateHookData(data)
+        _validateHookData(data)
         override
         view
         returns (bytes4)
@@ -193,7 +194,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     )
         external
         //_checkIsCustomRouter(sender)
-        //_validateHookData(data)
+        _validateHookData(data)
         override
 
         returns (bytes4, BeforeSwapDelta, uint24)
@@ -216,7 +217,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     )
         external
         //_checkIsCustomRouter(sender)
-        //_validateHookData(data)
+        _validateHookData(data)
         override
         returns (bytes4, int128)
     {
