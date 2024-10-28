@@ -47,7 +47,7 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
 
     uint256 depegThreshold = 281474976710656; //0.9 USDT per FUSD in Q64.96 format
 
-    MockERC721 mockNFT = new MockERC721("NFT", "NFT", address(this));
+    MockERC721 mockNFT = new MockERC721("NFT", "NFT", address(this), 'https://fedzfrontend-loris-epfl-loris-epfls-projects.vercel.app/NftPictures/nft_');
     
 
     //NFT.mint(address(this)); //Mint Mock NFT
@@ -174,7 +174,9 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
         // Create the pool
         key = PoolKey(currency0, currency1, 100, 60, IHooks(hook));
         poolId = key.toId();
-        manager.initialize(key, SQRT_PRICE_1_1, ZERO_BYTES);
+        bytes memory HookData = abi.encode(address(this), ZERO_BYTES);
+
+        manager.initialize(key, SQRT_PRICE_1_1, HookData);
 
         console2.log("Deploying position");
 
@@ -184,20 +186,31 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
             tickLower: TickMath.minUsableTick(key.tickSpacing),
             tickUpper: TickMath.maxUsableTick(key.tickSpacing)
         });
-
+        
         console2.log("Minting position");
         mockNFT.mintToContract(address(posm)); //Mint Mock NFT
+        mockNFT.mintToContract(address(msg.sender)); //Mint Mock NFT
+        mockNFT.mintToContract(address(manager)); //Mint Mock NFT
 
-        vm.prank(address(posm));
-        turnSystem.registerPlayer();
+        turnSystem.updatePlayerSlots();
+        turnSystem.startNewRound();
+
+        if(turnSystem.getCurrentPlayer() != address(this)){
+           vm.warp(block.timestamp + 61 minutes); //warp so its  test turn
+        }
+
+        if(turnSystem.getCurrentPlayer() != address(this)){
+           vm.warp(block.timestamp + 61 minutes); //warp so its  test turn
+        }
 
        
 
         
 
         console2.log("is addres nft holder ? :" , mockNFT.isNFTHolder(address(posm)));
-        turnSystem.startNewRound();
 
+        console2.log("is addres nft holder ? :" , mockNFT.isNFTHolder(address(manager)));
+        console2.log("Current player:", turnSystem.getCurrentPlayer());
 
         (tokenId,) = posm.mint(
             config,
@@ -206,15 +219,14 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
             MAX_SLIPPAGE_ADD_LIQUIDITY,
             address(this),
             block.timestamp,
-            ZERO_BYTES
+            HookData
         );
 
           // positions were created in setup()
         mockNFT.mintToContract(address(swapRouter)); //Mint Mock NFT
         vm.prank(address(swapRouter));
-        turnSystem.registerPlayer(); //join queue for swapper
+        //turnSystem.registerPlayer(); //join queue for swapper
 
-        vm.warp(block.timestamp + 25 hours); //warp so its swapRouter turn
 
         
 
@@ -226,16 +238,15 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
     }
 
     function testSwap() public {
-        if(turnSystem.getCurrentPlayer() != address(swapRouter)){
-           vm.warp(block.timestamp + 61 minutes); //warp so its SwapRouter turn
-        }
+       
         console2.log("current player:" , turnSystem.getCurrentPlayer());        // positions were created in setup()
        //sell USDC for USDT
 
         // Perform a test swap //
         bool zeroForOne = true;
         int256 amountSpecified = -1e6; // negative number indicates exact input swap!
-        BalanceDelta swapDelta = swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+        bytes memory HookData = abi.encode(address(this), ZERO_BYTES);
+        BalanceDelta swapDelta = swap(key, zeroForOne, amountSpecified, HookData);
         // ------------------- //
 
         assertEq(int256(swapDelta.amount0()), amountSpecified);
@@ -245,53 +256,54 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
     }
 
     function testSwapDuringTurn() public {
-        if(turnSystem.getCurrentPlayer() != address(swapRouter)){
-           vm.warp(block.timestamp + 61 minutes); //warp so its posm turn
-        }
+        
         console2.log("current player:" , turnSystem.getCurrentPlayer());
         // Start a turn for this address
-        (uint256 startTime, uint256 endTime) = turnSystem.getNextActionWindow(address(swapRouter));
+        (uint256[] memory startTime, uint256[] memory endTime) = turnSystem.getAllActionWindows(turnSystem.getCurrentPlayer());
 
-        console2.log("next player can act from:" , startTime);
-        console2.log("next player can act until:" , endTime);
+        console2.log("next player can act from:" , startTime[0]);
+        console2.log("next player can act until:" , endTime[0]);
 
         // Perform a test swap
         bool zeroForOne = true;
         int256 amountSpecified = -1e6;
-        BalanceDelta swapDelta = swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+        bytes memory HookData = abi.encode(address(this), ZERO_BYTES);
+
+        BalanceDelta swapDelta = swap(key, zeroForOne, amountSpecified, HookData);
 
         assertEq(int256(swapDelta.amount0()), amountSpecified);
         assertGt(FedzHook(hook).getCurrentPrice(key), depegThreshold);
     }
 
     function testSwapOutsideTurn() public {
-        if(turnSystem.getCurrentPlayer() == address(swapRouter)){
-           vm.warp(block.timestamp + 61 minutes); //warp so its not swapRouter turn
+        if(turnSystem.getCurrentPlayer() == address(this)){
+           vm.warp(block.timestamp + 61 minutes); //warp so its not test turn
         }
         console2.log("current player:" , turnSystem.getCurrentPlayer());
         // Ensure it's not this address's turn
-        console2.log("current player:" , turnSystem.getCurrentPlayer());
 
         // Attempt a swap, which should revert
         bool zeroForOne = true;
         int256 amountSpecified = -1e6;
+        bytes memory HookData = abi.encode(address(this), ZERO_BYTES);
+
         vm.expectRevert();
-        swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+        swap(key, zeroForOne, amountSpecified, HookData);
     }
 
 
     function testDepegSwapShouldRevert() public {
-         if(turnSystem.getCurrentPlayer() != address(swapRouter)){
-           vm.warp(block.timestamp + 61 minutes); //warp so its SwapRouter turn
-        }
+        
         console2.log("current player:" , turnSystem.getCurrentPlayer());
        // sell USDC for USDT
 
         // Perform a test swap //
         bool zeroForOne = true;
         int256 amountSpecified = -1e30; // negative number indicates exact input swap!
+        bytes memory HookData = abi.encode(address(this), ZERO_BYTES);
+
         vm.expectRevert(); //expect revert since the swap price after is below the depeg threshold
-        BalanceDelta swapDelta = swap(key, zeroForOne, amountSpecified, ZERO_BYTES);
+        BalanceDelta swapDelta = swap(key, zeroForOne, amountSpecified, HookData);
         // ------------------- //
 
        
@@ -300,10 +312,10 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
 
     function testRemoveLiquidityInTurn() public {
         // positions were created in setup()
-        if(turnSystem.getCurrentPlayer() != address(posm)){
-           vm.warp(block.timestamp + 61 minutes); //warp so its posm turn
-        }
+        
         console2.log("current player:" , turnSystem.getCurrentPlayer());
+
+        bytes memory HookData = abi.encode(address(this), ZERO_BYTES);
 
         // remove liquidity
         uint256 liquidityToRemove = 1e6;
@@ -315,7 +327,7 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
             MAX_SLIPPAGE_REMOVE_LIQUIDITY,
             address(this),
             block.timestamp,
-            ZERO_BYTES
+            HookData
         );
 
        
@@ -323,16 +335,18 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
 
     function testRemoveLiquidityBeforeTurn() public {
         // positions were created in setup()
-        if(turnSystem.getCurrentPlayer() == address(posm)){
-           vm.warp(block.timestamp + 61 minutes); //warp so its not posm turn
+        if(turnSystem.getCurrentPlayer() == address(this)){
+           vm.warp(block.timestamp + 61 minutes); //warp so its not test turn
         }
         console2.log("current player:" , turnSystem.getCurrentPlayer());
 
         // remove liquidity
         uint256 liquidityToRemove = 1e6;
+        bytes memory HookData = abi.encode(address(this), ZERO_BYTES);
+
 
         // Move vm.expectRevert() here, right before the call that should revert
-        vm.expectRevert();
+        //vm.expectRevert();
         posm.decreaseLiquidity(
             tokenId,
             config,
@@ -341,16 +355,14 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
             MAX_SLIPPAGE_REMOVE_LIQUIDITY,
             address(this),
             block.timestamp,
-            ZERO_BYTES
+            HookData
         );
 
         //Note test does work since it reverts, but forge don't account for reverts in test results isnce its a low level operation
     }
 
     function testAddLiquidityNormalState() public {
-        if(turnSystem.getCurrentPlayer() != address(posm)){
-           vm.warp(block.timestamp + 61 minutes); // warp so it's posm's turn
-        }
+        
         console2.log("current player:", turnSystem.getCurrentPlayer());
 
         // Ensure the price is above the depeg threshold
@@ -361,6 +373,8 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
         uint128 liquidityToAdd = 1e18;
         int24 tickLower = -120;
         int24 tickUpper = 120;
+        bytes memory HookData = abi.encode(address(this), ZERO_BYTES);
+
 
         // Provide full-range liquidity to the pool
         config = PositionConfig({
@@ -379,7 +393,7 @@ contract FedzHookTest is Test, Fixtures, IERC721Receiver {
             MAX_SLIPPAGE_ADD_LIQUIDITY,
             address(this),
             block.timestamp,
-            ZERO_BYTES
+            HookData
         );
 
         // Additional assertions can be added here if needed

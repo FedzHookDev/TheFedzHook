@@ -125,7 +125,7 @@ foundryup
 
 ```
 forge install
-forge test
+forge test --mc FedzHookTest --rpc-url https://eth.drpc.org -vvvv 
 ```
 
 ### Local Development (Anvil)
@@ -142,6 +142,9 @@ forge script script/Anvil.s.sol \
     --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
     --broadcast
 ```
+
+### Deploy on Sepolia
+ forge script script/TheFedzHook.s.sol --rpc-url https://ethereum-sepolia-rpc.publicnode.com --verify -vvvv --etherscan-api-key youkey --private-key youkey --broadcast
 
 <details>
 <summary><h3>Testnets</h3></summary>

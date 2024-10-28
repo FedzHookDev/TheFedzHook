@@ -25,6 +25,7 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     int24 depegTick;
     address USDT;
     address FUSD;
+    address public customRouter;
     uint24 baseFee;
     uint24 crisisFee;
     bool isInCrisis;
@@ -47,7 +48,9 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     event FeesUpdated(uint24 baseFee, uint24 crisisFee);
 
     event PriceIs(uint256 price); //Test only
-    
+
+    error NotCustomRouter(address router);
+    error NotPlayerTurn(address sender);
    
     constructor(
         address _owner,
@@ -92,7 +95,6 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         });
     }
 
-
     modifier _checkPlayerTurn(address player) {
         // If the current player hasn't played, skip their turn
        require(timeSlotSystem.canPlayerAct(player), "Not your turn");
@@ -100,21 +102,43 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         _;
     }
 
+
+    modifier _checkIsCustomRouter(address _router) {
+        // If the current player hasn't played, skip their turn
+       if(_router != customRouter){
+            revert NotCustomRouter(_router);
+       }
+        _;
+    }
+
+    modifier _validateHookData(bytes calldata data) {
+        require(data.length > 0, "No data provided");
+        (address actualSender, bytes memory actualData) = abi.decode(data, (address, bytes));
+        
+        if (!isNftHolder(actualSender)) {
+            revert NotNftHolder(actualSender);
+        }
+        if (!timeSlotSystem.isPlayerActive(actualSender)) {
+            revert NotPlayerTurn(actualSender);
+        }
+        _;
+    }
+
     function beforeAddLiquidity(
         address sender, // sender
         PoolKey calldata key, // key
         IPoolManager.ModifyLiquidityParams calldata params, // params
-        bytes calldata // data
+        bytes calldata data// data
     )
         external
-        onlyNFTOwner(sender)
-        _checkPlayerTurn(sender)
+        //checkIsCustomRouter(sender)
+        _validateHookData(data)
         override
         view
         
         returns (bytes4)
     {
-
+        
         
         // Get the current sqrt(price) from the pool
         uint160 currentSqrtPrice = getCurrentPrice(key);
@@ -123,6 +147,8 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         if (currentSqrtPrice < depegThreshold && params.tickLower >= TickMath.getTickAtSqrtPrice(currentSqrtPrice)) {
             revert("When depegged, can only add liquidity below current price");
         }
+
+        
         
 
 
@@ -133,12 +159,12 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         address sender, // sender
         PoolKey calldata key, // key
         IPoolManager.ModifyLiquidityParams calldata, // params
-        bytes calldata // data
+        bytes calldata data// data
 
     )
         external
-        _checkPlayerTurn(sender)
-        onlyNFTOwner(sender)
+        //_checkIsCustomRouter(sender)
+        _validateHookData(data)
         override
         view
         returns (bytes4)
@@ -164,11 +190,11 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         address sender, // sender
         PoolKey calldata key, // key
         IPoolManager.SwapParams calldata params, // params
-        bytes calldata // data
+        bytes calldata data// data
     )
         external
-        _checkPlayerTurn(sender)
-        onlyNFTOwner(sender)
+        //_checkIsCustomRouter(sender)
+        _validateHookData(data)
         override
 
         returns (bytes4, BeforeSwapDelta, uint24)
@@ -187,9 +213,11 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         PoolKey calldata key, // key
         IPoolManager.SwapParams calldata params, // params
         BalanceDelta delta, // delta
-        bytes calldata // data
+        bytes calldata data// data
     )
         external
+        //_checkIsCustomRouter(sender)
+        _validateHookData(data)
         override
         returns (bytes4, int128)
     {
@@ -208,7 +236,10 @@ contract FedzHook is BaseHook, NFTWhitelist  {
 
     
     
-
+    function updateCustomRouter(address _router) external onlyOwner {
+        require(_router != address(0), "Zero address");
+        customRouter = _router;
+    }
 
     //TODO check if this is needed
     mapping(address => uint256) private lastInteractionTime;
@@ -281,6 +312,10 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         baseFee = _baseFee;
         crisisFee = _crisisFee;
         emit FeesUpdated(_baseFee, _crisisFee);
+    }
+
+    function updateTimeSlotSystem(address _timeSlotSystem) external onlyOwner {
+        timeSlotSystem = TimeSlotSystem(_timeSlotSystem);
     }
 
 
