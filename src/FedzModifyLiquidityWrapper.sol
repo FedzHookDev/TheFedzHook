@@ -38,7 +38,8 @@ contract FedzModifyLiquidityWrapper is IFedzModifyLiquidityWrapper, AbsFedzPoolW
             salt: bytes32(uint256(uint160(player)))
         });
 
-        (BalanceDelta delta, BalanceDelta feeDelta) = IPoolManager(poolManager).modifyLiquidity(pool, modifyLiquidityParams, data);
+        bytes memory hookData = abi.encode(player);
+        (BalanceDelta delta, BalanceDelta feeDelta) = IPoolManager(poolManager).modifyLiquidity(pool, modifyLiquidityParams, hookData);
         results = abi.encode(delta, feeDelta);
         _closeDelta(player, params.token0, params.token1, delta, pool);
     }

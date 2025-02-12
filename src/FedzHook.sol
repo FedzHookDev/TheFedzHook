@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
 import {BaseHook} from "v4-periphery/src/base/hooks/BaseHook.sol";
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {Hooks} from "v4-core/src/libraries/Hooks.sol";
@@ -5,19 +8,18 @@ import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
-import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/src/types/BeforeSwapDelta.sol";
+import {BeforeSwapDelta} from "v4-core/src/types/BeforeSwapDelta.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
+import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
-import {NFTAccessScheduler} from "./NFTAccessScheduler.sol";
 import {NFTWhitelist} from "./NFTWhitelist.sol";
-import {TimeSlotSystem} from "./TimeSlotSystem.sol";
-import {NFTAccessScheduler} from "./NFTAccessScheduler.sol";
+import {IFedzHook} from "./interfaces/IFedzHook.sol";
+import {ITimeSlotSystem} from "./interfaces/ITimeSlotSystem.sol";
+import {IFedzModifyLiquidityWrapper} from "./interfaces/IFedzModifyLiquidityWrapper.sol";
 
-
-contract FedzHook is BaseHook, NFTWhitelist  {
+contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
 
@@ -30,28 +32,12 @@ contract FedzHook is BaseHook, NFTWhitelist  {
     uint24 crisisFee;
     bool isInCrisis;
 
-    TimeSlotSystem public  timeSlotSystem;
-
+    ITimeSlotSystem public timeSlotSystem;
 
     address public manager;
+    address public fedzModifyLiquidityWrapper;
+    address public fedzSwapWrapper;
 
-    event DepegThresholdUpdated(uint256 newThreshold);
-    event CrisisStateChanged(bool isInCrisis);
-    event LiquidityAdded(address user, uint128 amount);
-    event LiquidityRemoved(address user, uint128 amount);
-    event BeforeSwapExecuted(address user, bool zeroForOne, int256 amountIn);
-
-    event AfterSwapExecuted(address user, bool zeroForOne, int256 amountIn);
-    event RewardClaimed(address user, uint256 amount);
-    event LiquidityAdded(address indexed sender, uint128 liquidity, int24 tickLower, int24 tickUpper);
-    event LiquidityRemoved(address indexed sender, uint128 liquidity, int24 tickLower, int24 tickUpper);
-    event FeesUpdated(uint24 baseFee, uint24 crisisFee);
-
-    event PriceIs(uint256 price); //Test only
-
-    error NotCustomRouter(address router);
-    error NotPlayerTurn(address sender);
-   
     constructor(
         address _owner,
         IPoolManager _poolManager,
@@ -67,13 +53,189 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         USDT = _USDT;
         FUSD = _FUSD;
         depegThreshold = _depegThreshold;
-        timeSlotSystem = TimeSlotSystem(_timeSlotSystem);
+        timeSlotSystem = ITimeSlotSystem(_timeSlotSystem);
         emit DepegThresholdUpdated(_depegThreshold);
 
         baseFee = 3000; // 0.01%
         crisisFee = 6000; // 0.1%
         emit FeesUpdated(baseFee, crisisFee);
         isInCrisis = false;
+    }
+
+    modifier onlyModifyLiquidityWrpper(address sender) {
+        require(sender == fedzModifyLiquidityWrapper, "NotModifyLiquidityWrapper");
+        _;
+    }
+
+    modifier onlySwapWrpper(address sender) {
+        require(sender == fedzSwapWrapper, "NotSwapWrapper");
+        _;
+    }
+
+    modifier onlyCorrectPlayer(bytes calldata data) {
+        require(data.length > 0, "No data provided");
+        (address player) = abi.decode(data, (address));
+        if (!isNftHolder(player)) {
+            revert NotNftHolder(player);
+        }
+        if (!timeSlotSystem.isPlayerActive(player)) {
+            revert NotPlayerTurn(player);
+        }
+        _;
+    }
+
+    function beforeAddLiquidity(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.ModifyLiquidityParams calldata params,
+        bytes calldata data
+    )
+        external
+        onlyByPoolManager
+        onlyModifyLiquidityWrpper(sender)
+        onlyCorrectPlayer(data)
+        override(IFedzHook, BaseHook)
+        view
+        
+        returns (bytes4)
+    {
+        // Get the current sqrt(price) from the pool
+        uint160 currentSqrtPrice = getCurrentPrice(key);
+
+        // Compare the current sqrt(price) directly with the depegThreshold
+        if (currentSqrtPrice < depegThreshold && params.tickLower >= TickMath.getTickAtSqrtPrice(currentSqrtPrice)) {
+            revert("When depegged, can only add liquidity below current price");
+        }
+        return IHooks.beforeAddLiquidity.selector;
+    }
+
+    function afterAddLiquidity(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.ModifyLiquidityParams calldata params,
+        bytes calldata data
+    )
+        external
+        onlyByPoolManager
+        view        
+        returns (bytes4)
+    {}
+
+    function beforeRemoveLiquidity(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.ModifyLiquidityParams calldata,
+        bytes calldata data
+    )
+        external
+        onlyByPoolManager
+        onlyModifyLiquidityWrpper(sender)
+        onlyCorrectPlayer(data)
+        override(IFedzHook, BaseHook)
+        view
+        returns (bytes4)
+    {
+        // Get the current sqrt(price) from the pool
+        uint160 currentSqrtPrice = getCurrentPrice(key);
+        if (currentSqrtPrice < depegThreshold) {
+            revert("Price is below depeg threshold");
+        }
+        return IHooks.beforeRemoveLiquidity.selector;
+    }
+
+    function beforeSwap(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.SwapParams calldata params,
+        bytes calldata data
+    )
+        external
+        onlyByPoolManager
+        onlySwapWrpper(sender)
+        onlyCorrectPlayer(data)
+        override(IFedzHook, BaseHook)
+        returns (bytes4, BeforeSwapDelta, uint24)
+    {
+        uint24 fee = isInCrisis ? crisisFee : baseFee;
+        emit BeforeSwapExecuted(sender, params.zeroForOne, params.amountSpecified);
+        return (IHooks.beforeSwap.selector, BeforeSwapDelta.wrap(0), fee);
+    }
+
+    function afterSwap(
+        address sender,
+        PoolKey calldata key,
+        IPoolManager.SwapParams calldata params,
+        BalanceDelta delta,
+        bytes calldata data
+    )
+        external
+        onlyByPoolManager
+        override (BaseHook, IFedzHook)
+        returns (bytes4, int128)
+    {
+        // Get the current sqrt(price) from the pool
+        uint160 currentSqrtPrice = getCurrentPrice(key);
+        emit PriceIs(uint256(currentSqrtPrice));
+
+        // Compare the current sqrt(price) directly with the depegThreshold
+        if (currentSqrtPrice < depegThreshold) {
+            revert("Price is below depeg threshold");
+        }
+        emit AfterSwapExecuted(sender, params.zeroForOne, params.amountSpecified);
+        return (IHooks.afterSwap.selector, 0);
+    }
+
+    function getCurrentPrice(PoolKey memory poolKey) public view returns (uint160 sqrtPriceX96) {
+        (sqrtPriceX96,,,) = poolManager.getSlot0(poolKey.toId());
+    }
+
+    function calculatePriceUint256(uint160 sqrtPriceX96, uint8 token0Decimals, uint8 token1Decimals) public  returns (uint256) {
+        uint256 price = uint256(sqrtPriceX96) * uint256(sqrtPriceX96) * (10**token1Decimals) / (2**192) / (10**token0Decimals);
+        emit PriceIs(price);
+        return price;
+    }
+
+    function calculatePrice(uint160 sqrtPriceX96) public  returns (uint256) {
+        uint256 price = uint256(sqrtPriceX96) **2  / (2**192);
+        emit PriceIs(price);
+        return price;
+    }
+
+    function getCurrentTick(PoolKey memory poolKey) public view returns (int24 tick) {
+        (, tick,,) = poolManager.getSlot0(poolKey.toId());
+        return tick;
+    }
+
+
+    function getDecimals(Currency currency) public view returns (uint8) {
+        if (currency.isNative()) {
+            return 18; // ETH (or native currency) always has 18 decimals
+        } else {
+            address tokenAddress = Currency.unwrap(currency);
+            return IERC20(tokenAddress).decimals();
+        }
+    }
+
+    function tickToPrice(int24 tick, uint8 token0Decimals, uint8 token1Decimals) public pure returns (uint256) {
+        uint256 price;
+        if (tick >= 0) {
+            price = uint256(1e18);
+            for (int24 i = 0; i < tick; i++) {
+                price = (price * 10001) / 10000;
+            }
+        } else {
+            price = uint256(1e18);
+            for (int24 i = tick; i < 0; i++) {
+                price = (price * 10000) / 10001;
+            }
+        }
+
+        // Adjust for decimal places
+        if (tick >= 0) {
+            return (price * 10 ** (token1Decimals + 18 - token0Decimals)) / 1e18;
+        } else {
+            return (10 ** (token0Decimals + 18 + token1Decimals)) / price;
+        }
     }
 
     function getHookPermissions() public pure override returns (Hooks.Permissions memory){
@@ -95,212 +257,12 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         });
     }
 
-    modifier _checkPlayerTurn(address player) {
-        // If the current player hasn't played, skip their turn
-       require(timeSlotSystem.canPlayerAct(player), "Not your turn");
-       
-        _;
-    }
-
-
-    modifier _checkIsCustomRouter(address _router) {
-        // If the current player hasn't played, skip their turn
-       if(_router != customRouter){
-            revert NotCustomRouter(_router);
-       }
-        _;
-    }
-
-    modifier _validateHookData(bytes calldata data) {
-        require(data.length > 0, "No data provided");
-        (address actualSender, bytes memory actualData) = abi.decode(data, (address, bytes));
-        
-        if (!isNftHolder(actualSender)) {
-            revert NotNftHolder(actualSender);
-        }
-        if (!timeSlotSystem.isPlayerActive(actualSender)) {
-            revert NotPlayerTurn(actualSender);
-        }
-        _;
-    }
-
-    function beforeAddLiquidity(
-        address sender, // sender
-        PoolKey calldata key, // key
-        IPoolManager.ModifyLiquidityParams calldata params, // params
-        bytes calldata data// data
-    )
-        external
-        //checkIsCustomRouter(sender)
-        _validateHookData(data)
-        override
-        view
-        
-        returns (bytes4)
-    {
-        
-        
-        // Get the current sqrt(price) from the pool
-        uint160 currentSqrtPrice = getCurrentPrice(key);
-
-        // Compare the current sqrt(price) directly with the depegThreshold
-        if (currentSqrtPrice < depegThreshold && params.tickLower >= TickMath.getTickAtSqrtPrice(currentSqrtPrice)) {
-            revert("When depegged, can only add liquidity below current price");
-        }
-
-        
-        
-
-
-        return IHooks.beforeAddLiquidity.selector;
-    }
-
-    function beforeRemoveLiquidity(
-        address sender, // sender
-        PoolKey calldata key, // key
-        IPoolManager.ModifyLiquidityParams calldata, // params
-        bytes calldata data// data
-
-    )
-        external
-        //_checkIsCustomRouter(sender)
-        _validateHookData(data)
-        override
-        view
-        returns (bytes4)
-    {
-        
-        // Get the current sqrt(price) from the pool
-        uint160 currentSqrtPrice = getCurrentPrice(key);
-
-        // Compare the current sqrt(price) directly with the depegThreshold
-        if (currentSqrtPrice < depegThreshold) {
-            revert("Price is below depeg threshold");
-        }
-        
-
-        return IHooks.beforeRemoveLiquidity.selector;
-    }
-
-    
-
-    
-
-    function beforeSwap(
-        address sender, // sender
-        PoolKey calldata key, // key
-        IPoolManager.SwapParams calldata params, // params
-        bytes calldata data// data
-    )
-        external
-        //_checkIsCustomRouter(sender)
-        _validateHookData(data)
-        override
-
-        returns (bytes4, BeforeSwapDelta, uint24)
-
-    {
-        
-        uint24 fee = isInCrisis ? crisisFee : baseFee;
-        emit BeforeSwapExecuted(sender, params.zeroForOne, params.amountSpecified);
-        
-    
-        return (IHooks.beforeSwap.selector, BeforeSwapDelta.wrap(0), fee);
-    }
-
-    function afterSwap(
-        address sender, // sender
-        PoolKey calldata key, // key
-        IPoolManager.SwapParams calldata params, // params
-        BalanceDelta delta, // delta
-        bytes calldata data// data
-    )
-        external
-        //_checkIsCustomRouter(sender)
-        _validateHookData(data)
-        override
-        returns (bytes4, int128)
-    {
-        // Get the current sqrt(price) from the pool
-        uint160 currentSqrtPrice = getCurrentPrice(key);
-        emit PriceIs(uint256(currentSqrtPrice));
-
-        // Compare the current sqrt(price) directly with the depegThreshold
-        if (currentSqrtPrice < depegThreshold) {
-            revert("Price is below depeg threshold");
-        }
-        emit AfterSwapExecuted(sender, params.zeroForOne, params.amountSpecified);
-        return (IHooks.afterSwap.selector, 0);
-    }
-
-
-    
-    
+    ////////////////////////////////////////////////////
+    ///// Admin functions
+    ////////////////////////////////////////////////////
     function updateCustomRouter(address _router) external onlyOwner {
         require(_router != address(0), "Zero address");
         customRouter = _router;
-    }
-
-    //TODO check if this is needed
-    mapping(address => uint256) private lastInteractionTime;
-
-    function checkFlashloanPrevention(address user) internal {
-        require(block.timestamp - lastInteractionTime[user] > 1, "Potential flashloan detected");
-        lastInteractionTime[user] = block.timestamp;
-    }
-    
-
-    function getCurrentPrice(PoolKey memory poolKey) public view returns (uint160 sqrtPriceX96) {
-        (sqrtPriceX96,,,) = poolManager.getSlot0(poolKey.toId());
-    }
-
-    function calculatePriceUint256(uint160 sqrtPriceX96, uint8 token0Decimals, uint8 token1Decimals) public  returns (uint256) {
-        uint256 price = uint256(sqrtPriceX96) * uint256(sqrtPriceX96) * (10**token1Decimals) / (2**192) / (10**token0Decimals);
-        emit PriceIs(price);
-        return price;
-    }
-
-     function calculatePrice(uint160 sqrtPriceX96) public  returns (uint256) {
-        uint256 price = uint256(sqrtPriceX96) **2  / (2**192);
-        emit PriceIs(price);
-        return price;
-    }
-
-    function getCurrentTick(PoolKey memory poolKey) public view returns (int24 tick) {
-        (, tick,,) = poolManager.getSlot0(poolKey.toId());
-        return tick;
-    }
-
-    function tickToPrice(int24 tick, uint8 token0Decimals, uint8 token1Decimals) public pure returns (uint256) {
-    uint256 price;
-        if (tick >= 0) {
-            price = uint256(1e18);
-            for (int24 i = 0; i < tick; i++) {
-                price = (price * 10001) / 10000;
-            }
-        } else {
-            price = uint256(1e18);
-            for (int24 i = tick; i < 0; i++) {
-                price = (price * 10000) / 10001;
-            }
-        }
-
-        // Adjust for decimal places
-        if (tick >= 0) {
-            return (price * 10 ** (token1Decimals + 18 - token0Decimals)) / 1e18;
-        } else {
-            return (10 ** (token0Decimals + 18 + token1Decimals)) / price;
-        }
-    }
-
-
-    function getDecimals(Currency currency) public view returns (uint8) {
-        if (currency.isNative()) {
-            return 18; // ETH (or native currency) always has 18 decimals
-        } else {
-            address tokenAddress = Currency.unwrap(currency);
-            return IERC20Metadata(tokenAddress).decimals();
-        }
     }
 
     function setDepegThreshold(uint256 _depegThreshold) external onlyOwner {
@@ -308,16 +270,20 @@ contract FedzHook is BaseHook, NFTWhitelist  {
         emit DepegThresholdUpdated(_depegThreshold);
     }
 
-    function updateFees(uint24 _baseFee, uint24 _crisisFee) external onlyOwner {
+    function setFees(uint24 _baseFee, uint24 _crisisFee) external onlyOwner {
         baseFee = _baseFee;
         crisisFee = _crisisFee;
         emit FeesUpdated(_baseFee, _crisisFee);
     }
 
-    function updateTimeSlotSystem(address _timeSlotSystem) external onlyOwner {
-        timeSlotSystem = TimeSlotSystem(_timeSlotSystem);
+    function setTimeSlotSystem(address _timeSlotSystem) external onlyOwner {
+        timeSlotSystem = ITimeSlotSystem(_timeSlotSystem);
     }
 
+    function setFedzPoolWrapper(address _fedzModifyLiquidityWrapper, address _fedzSwapWrapper) external {
+        fedzModifyLiquidityWrapper = _fedzModifyLiquidityWrapper;
+        fedzSwapWrapper = _fedzSwapWrapper;
+    }
 
     //Helper function to return PoolKey
     function _getPoolKey() private view returns (PoolKey memory) {

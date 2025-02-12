@@ -6,6 +6,23 @@ import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/src/types/BeforeS
 
 interface IFedzHook is IHooks {
 
+    event DepegThresholdUpdated(uint256 newThreshold);
+    event CrisisStateChanged(bool isInCrisis);
+    event LiquidityAdded(address user, uint128 amount);
+    event LiquidityRemoved(address user, uint128 amount);
+    event BeforeSwapExecuted(address user, bool zeroForOne, int256 amountIn);
+
+    event AfterSwapExecuted(address user, bool zeroForOne, int256 amountIn);
+    event RewardClaimed(address user, uint256 amount);
+    event LiquidityAdded(address indexed sender, uint128 liquidity, int24 tickLower, int24 tickUpper);
+    event LiquidityRemoved(address indexed sender, uint128 liquidity, int24 tickLower, int24 tickUpper);
+    event FeesUpdated(uint24 baseFee, uint24 crisisFee);
+
+    event PriceIs(uint256 price); //Test only
+
+    error NotCustomRouter(address router);
+    error NotPlayerTurn(address sender);
+
     function beforeAddLiquidity(
         address sender,
         PoolKey calldata key,

@@ -16,7 +16,7 @@ contract FedzSwapWrapper is IFedzSwapWrapper, AbsFedzPoolWrapper {
         delta = abi.decode(results, (BalanceDelta));
     }
 
-    function unlockCallback(bytes memory data) public returns(bytes memory results) {
+    function unlockCallback(bytes memory data) external onlyPoolManager returns(bytes memory results) {
         (address player
         , address token0
         , address token1

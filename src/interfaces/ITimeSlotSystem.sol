@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 
-interface TimeSlotSystem {
+interface ITimeSlotSystem {
 
     struct Player {
         bool isRegistered;
@@ -25,8 +25,4 @@ interface TimeSlotSystem {
     function getNextActionWindow(address player) external view returns (uint256 startTime, uint256 endTime);
 
     function getAllActionWindows(address player) external view returns (uint256[] memory startTimes, uint256[] memory endTimes);
-
-    function isRoundActive() external view returns (bool);
-
-    function getRoundTimeLeft() external view returns (uint256);
 }
