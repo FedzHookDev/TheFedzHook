@@ -6,8 +6,6 @@ interface IFedzModifyLiquidityWrapper {
     struct FedzModifyLiquidityParams {
         address token0;
         address token1;
-        uint256 amount0;
-        uint256 amount1;
         // the lower and upper tick of the position
         int24 tickLower;
         int24 tickUpper;

@@ -62,12 +62,12 @@ contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
         isInCrisis = false;
     }
 
-    modifier onlyModifyLiquidityWrpper(address sender) {
+    modifier onlyModifyLiquidityWrapper(address sender) {
         require(sender == fedzModifyLiquidityWrapper, "NotModifyLiquidityWrapper");
         _;
     }
 
-    modifier onlySwapWrpper(address sender) {
+    modifier onlySwapWrapper(address sender) {
         require(sender == fedzSwapWrapper, "NotSwapWrapper");
         _;
     }
@@ -78,7 +78,7 @@ contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
         if (!isNftHolder(player)) {
             revert NotNftHolder(player);
         }
-        if (!timeSlotSystem.canPlayerAct(player)) {
+        if (timeSlotSystem.getCurrentPlayer() != player) {
             revert NotPlayerTurn(player);
         }
         _;
@@ -92,7 +92,7 @@ contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
     )
         external
         onlyByPoolManager
-        onlyModifyLiquidityWrpper(sender)
+        onlyModifyLiquidityWrapper(sender)
         onlyCorrectPlayer(data)
         override(IFedzHook, BaseHook)
         view
@@ -129,7 +129,7 @@ contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
     )
         external
         onlyByPoolManager
-        onlyModifyLiquidityWrpper(sender)
+        onlyModifyLiquidityWrapper(sender)
         onlyCorrectPlayer(data)
         override(IFedzHook, BaseHook)
         view
@@ -151,7 +151,7 @@ contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
     )
         external
         onlyByPoolManager
-        onlySwapWrpper(sender)
+        onlySwapWrapper(sender)
         onlyCorrectPlayer(data)
         override(IFedzHook, BaseHook)
         returns (bytes4, BeforeSwapDelta, uint24)

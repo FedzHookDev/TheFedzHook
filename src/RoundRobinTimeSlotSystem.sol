@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {TheFedz} from "./TheFedz.sol";
 import {ITimeSlotSystem} from "./interfaces/ITimeSlotSystem.sol";
-import {console} from "forge-std/console.sol";
 
 contract RoundRobinTimeSlotSystem is ITimeSlotSystem, Ownable {
 
@@ -18,12 +17,14 @@ contract RoundRobinTimeSlotSystem is ITimeSlotSystem, Ownable {
     }
 
     function restart(uint256 _slotDuration, uint256 _startsAt) external onlyOwner {
+        require(_startsAt >= block.timestamp, "Invalid start time");
         slotDuration = _slotDuration;
         startsAt = _startsAt;
+        emit Restart(slotDuration, startsAt);
     }
 
     function getCurrentPlayer() public view returns (address) {
-        if (startsAt == 0 || block.timestamp < startsAt) {
+        if (!isStarted()) {
             return address(0);
         }
         uint256 totalTurns = nftContract.totalSupply();
@@ -31,7 +32,12 @@ contract RoundRobinTimeSlotSystem is ITimeSlotSystem, Ownable {
             return address(0);
         }
         uint256 currentSlot = ((block.timestamp - startsAt) / slotDuration) % totalTurns;
-        return nftContract.ownerOf(currentSlot);
+        uint256 tokenId = nftContract.tokenByIndex(currentSlot);
+        return nftContract.ownerOf(tokenId);
+    }
+
+    function isStarted() public view returns (bool) {
+        return startsAt > 0 && block.timestamp >= startsAt;
     }
 
     function setNFTContract(address _nftContract) external onlyOwner {
