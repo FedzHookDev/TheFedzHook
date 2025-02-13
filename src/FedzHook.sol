@@ -78,7 +78,7 @@ contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
         if (!isNftHolder(player)) {
             revert NotNftHolder(player);
         }
-        if (!timeSlotSystem.isPlayerActive(player)) {
+        if (!timeSlotSystem.canPlayerAct(player)) {
             revert NotPlayerTurn(player);
         }
         _;
@@ -260,11 +260,6 @@ contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
     ////////////////////////////////////////////////////
     ///// Admin functions
     ////////////////////////////////////////////////////
-    function updateCustomRouter(address _router) external onlyOwner {
-        require(_router != address(0), "Zero address");
-        customRouter = _router;
-    }
-
     function setDepegThreshold(uint256 _depegThreshold) external onlyOwner {
         depegThreshold = _depegThreshold;
         emit DepegThresholdUpdated(_depegThreshold);
