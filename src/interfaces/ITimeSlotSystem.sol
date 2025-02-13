@@ -15,5 +15,5 @@ interface ITimeSlotSystem {
     event RoundEnded(uint256 endTime, uint256 roundNumber);
 
     function getCurrentPlayer() external view returns (address);
-    function canPlayerAct(address player) external view returns (bool);
+    // function canPlayerAct(address player) external view returns (bool);
 }
