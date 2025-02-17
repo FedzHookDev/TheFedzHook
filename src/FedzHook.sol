@@ -35,8 +35,8 @@ contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
     ITimeSlotSystem public timeSlotSystem;
 
     address public manager;
-    address public fedzModifyLiquidityWrapper;
-    address public fedzSwapWrapper;
+    address public fedzPositionManager;
+    address public fedzSwapRouter;
 
     constructor(
         address _owner,
@@ -62,13 +62,13 @@ contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
         isInCrisis = false;
     }
 
-    modifier onlyModifyLiquidityWrapper(address sender) {
-        require(sender == fedzModifyLiquidityWrapper, "NotModifyLiquidityWrapper");
+    modifier onlyFedzPositionManager(address sender) {
+        require(sender == fedzPositionManager, "NotFedzPositionManager");
         _;
     }
 
-    modifier onlySwapWrapper(address sender) {
-        require(sender == fedzSwapWrapper, "NotSwapWrapper");
+    modifier onlyFedzSwapRouter(address sender) {
+        require(sender == fedzSwapRouter, "NotFedzPositionManager");
         _;
     }
 
@@ -92,7 +92,7 @@ contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
     )
         external
         onlyByPoolManager
-        onlyModifyLiquidityWrapper(sender)
+        onlyFedzPositionManager(sender)
         onlyCorrectPlayer(data)
         override(IFedzHook, BaseHook)
         view
@@ -129,7 +129,7 @@ contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
     )
         external
         onlyByPoolManager
-        onlyModifyLiquidityWrapper(sender)
+        onlyFedzPositionManager(sender)
         onlyCorrectPlayer(data)
         override(IFedzHook, BaseHook)
         view
@@ -151,7 +151,7 @@ contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
     )
         external
         onlyByPoolManager
-        onlySwapWrapper(sender)
+        onlyFedzSwapRouter(sender)
         onlyCorrectPlayer(data)
         override(IFedzHook, BaseHook)
         returns (bytes4, BeforeSwapDelta, uint24)
@@ -275,9 +275,12 @@ contract FedzHook is IFedzHook, BaseHook, NFTWhitelist  {
         timeSlotSystem = ITimeSlotSystem(_timeSlotSystem);
     }
 
-    function setFedzPoolWrapper(address _fedzModifyLiquidityWrapper, address _fedzSwapWrapper) external {
-        fedzModifyLiquidityWrapper = _fedzModifyLiquidityWrapper;
-        fedzSwapWrapper = _fedzSwapWrapper;
+    function setFedzPositionManager(address _fedzPositionManager) external onlyOwner {
+        fedzPositionManager = _fedzPositionManager;
+    }
+
+    function setFedzSwapRouter(address _fedzSwapRouter) external onlyOwner {
+        fedzSwapRouter = _fedzSwapRouter;
     }
 
     //Helper function to return PoolKey

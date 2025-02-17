@@ -5,11 +5,15 @@ import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {AbsFedzPoolWrapper} from "./AbsFedzPoolWrapper.sol";
 import {IFedzModifyLiquidityWrapper} from "./interfaces/IFedzModifyLiquidityWrapper.sol";
+import {SafeCallback} from "v4-periphery/src/base/SafeCallback.sol";
 
-contract FedzModifyLiquidityWrapper is IFedzModifyLiquidityWrapper, AbsFedzPoolWrapper {
+contract FedzModifyLiquidityWrapper is IFedzModifyLiquidityWrapper, AbsFedzPoolWrapper, SafeCallback {
 
 
-    constructor(address _TheFedzHook, uint24 _swapFee, int24 tickSpacing, address _poolManager) AbsFedzPoolWrapper(_TheFedzHook, _swapFee, tickSpacing, _poolManager) {}
+    constructor(address _TheFedzHook, uint24 _swapFee, int24 tickSpacing, address _poolManager) 
+        AbsFedzPoolWrapper(_TheFedzHook, _swapFee, tickSpacing)
+        SafeCallback(IPoolManager(_poolManager))
+    {}
 
     function modifiyLiquidity(FedzModifyLiquidityParams memory params) external returns(BalanceDelta delta, BalanceDelta feeDelta) {
         bytes memory callbackData = abi.encode(msg.sender, params);
@@ -17,7 +21,7 @@ contract FedzModifyLiquidityWrapper is IFedzModifyLiquidityWrapper, AbsFedzPoolW
         return abi.decode(results, (BalanceDelta, BalanceDelta));
     }
 
-    function unlockCallback(bytes memory data) external returns(bytes memory results) {
+    function _unlockCallback(bytes calldata data) internal override returns(bytes memory results) {
 
         (address player
         , FedzModifyLiquidityParams memory params

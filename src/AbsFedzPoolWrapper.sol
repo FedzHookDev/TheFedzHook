@@ -5,23 +5,14 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 abstract contract AbsFedzPoolWrapper {
 
-    address immutable poolManager;
     address immutable TheFedzHook;
     uint24 immutable swapFee; // set 4000 for 0.40% fee tier
     int24 immutable tickSpacing;
 
-    error NotPoolManager();
-
-    constructor(address _TheFedzHook, uint24 _swapFee, int24 _tickSpacing, address _poolManager) {
+    constructor(address _TheFedzHook, uint24 _swapFee, int24 _tickSpacing) {
         TheFedzHook = _TheFedzHook;
         swapFee = _swapFee;
         tickSpacing = _tickSpacing;
-        poolManager = _poolManager;
-    }
-
-    modifier onlyPoolManager() {
-        if (msg.sender != poolManager) revert NotPoolManager();
-        _;
     }
 
     function _closeDelta(address player, address token0, address token1, BalanceDelta delta, PoolKey memory pool) internal {

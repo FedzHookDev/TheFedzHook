@@ -24,20 +24,29 @@ contract RoundRobinTimeSlotSystem is ITimeSlotSystem, Ownable {
     }
 
     function getCurrentPlayer() public view returns (address) {
-        if (!isStarted()) {
+        return getPlayerByTimestamp(block.timestamp);
+    }
+
+    event CurrentSlot(uint);
+    function getPlayerByTimestamp(uint256 timestamp) public view returns (address) {
+        if (!isActiveOn(timestamp)) {
             return address(0);
         }
         uint256 totalTurns = nftContract.totalSupply();
         if (totalTurns == 0) {
             return address(0);
         }
-        uint256 currentSlot = ((block.timestamp - startsAt) / slotDuration) % totalTurns;
+        uint256 currentSlot = ((timestamp - startsAt) / slotDuration) % totalTurns;
         uint256 tokenId = nftContract.tokenByIndex(currentSlot);
         return nftContract.ownerOf(tokenId);
     }
 
     function isStarted() public view returns (bool) {
-        return startsAt > 0 && block.timestamp >= startsAt;
+        return isActiveOn(block.timestamp);
+    }
+
+    function isActiveOn(uint timestamp) public view returns (bool) {
+        return startsAt > 0 && timestamp >= startsAt;
     }
 
     function setNFTContract(address _nftContract) external onlyOwner {

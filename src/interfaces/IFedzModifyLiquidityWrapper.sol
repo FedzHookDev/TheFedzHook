@@ -14,6 +14,4 @@ interface IFedzModifyLiquidityWrapper {
     }
 
     function modifiyLiquidity(FedzModifyLiquidityParams memory params) external returns(BalanceDelta delta, BalanceDelta feeDelta);
-
-    function unlockCallback(bytes memory data) external returns(bytes memory results);
 }

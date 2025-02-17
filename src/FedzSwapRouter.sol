@@ -4,11 +4,15 @@ import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {AbsFedzPoolWrapper} from "./AbsFedzPoolWrapper.sol";
-import {IFedzSwapWrapper} from "./interfaces/IFedzSwapWrapper.sol";
+import {IFedzSwapRouter} from "./interfaces/IFedzSwapRouter.sol";
+import {SafeCallback} from "v4-periphery/src/base/SafeCallback.sol";
 
-contract FedzSwapWrapper is IFedzSwapWrapper, AbsFedzPoolWrapper {
+contract FedzSwapRouter is IFedzSwapRouter, AbsFedzPoolWrapper, SafeCallback {
 
-    constructor(address _TheFedzHook, uint24 _swapFee, int24 tickSpacing, address _poolManager) AbsFedzPoolWrapper(_TheFedzHook, _swapFee, tickSpacing, _poolManager) {}
+    constructor(address _TheFedzHook, uint24 _swapFee, int24 tickSpacing, address _poolManager) 
+        AbsFedzPoolWrapper(_TheFedzHook, _swapFee, tickSpacing)
+        SafeCallback(IPoolManager(_poolManager))
+    {}
 
     function swap(address token0, address token1, IPoolManager.SwapParams memory params) external returns(BalanceDelta delta) {
         bytes memory callbackData = abi.encode(msg.sender, token0, token1, params);
@@ -16,7 +20,7 @@ contract FedzSwapWrapper is IFedzSwapWrapper, AbsFedzPoolWrapper {
         delta = abi.decode(results, (BalanceDelta));
     }
 
-    function unlockCallback(bytes memory data) external onlyPoolManager returns(bytes memory results) {
+    function _unlockCallback(bytes calldata data) internal override returns(bytes memory results) {
         (address player
         , address token0
         , address token1
