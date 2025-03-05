@@ -1,8 +1,5 @@
 @uniswap/v4-core/=lib/v4-core/
-forge-gas-snapshot/=lib/v4-core/lib/forge-gas-snapshot/src/
-forge-std/=lib/v4-core/lib/forge-std/src/
-permit2/=lib/v4-periphery/lib/permit2/
-solmate/=lib/v4-core/lib/solmate/
-v4-core/=lib/v4-core/
-v4-periphery/=lib/v4-periphery/
-@openzeppelin/=lib/openzeppelin-contracts/
+@uniswap/v4-periphery/=lib/v4-periphery/
+@uniswap/permit2/=lib/permit2/
+@uniswap/universal-router/=lib/universal-router/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/

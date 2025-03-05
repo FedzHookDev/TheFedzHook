@@ -3,30 +3,33 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Script.sol";
 import "forge-std/console.sol";
-import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
-import {PoolManager} from "v4-core/src/PoolManager.sol";
-import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
-import {PoolKey} from "v4-core/src/types/PoolKey.sol";
-import {CurrencyLibrary, Currency} from "v4-core/src/types/Currency.sol";
-import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
+import "forge-std/StdCheats.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {CurrencyLibrary, Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 
-contract CreatePoolScript is Script {
+// forge script script/01_CreatePool.s.sol:CreatePoolScript --private-key <PK> --rpc-url https://arbitrum.rpc.subquery.network/public --etherscan-api-key 6N6Q2DRTUHGIVZ462FXWCX8AW7JPJTZBQ3 --broadcast -vvvv --verify
+contract CreatePoolScript is Script, StdCheats {
     using CurrencyLibrary for Currency;
 
     //addresses with contracts deployed
-    address constant GOERLI_POOLMANAGER = address(0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b); //pool manager deployed to GOERLI
-    address constant MUNI_ADDRESS = address(0xbD97BF168FA913607b996fab823F88610DCF7737); //mUNI deployed to GOERLI -- insert your own contract address here
-    address constant MUSDC_ADDRESS = address(0xa468864e673a807572598AB6208E49323484c6bF); //mUSDC deployed to GOERLI -- insert your own contract address here
-    address constant HOOK_ADDRESS = address(0x3CA2cD9f71104a6e1b67822454c725FcaeE35fF6); //address of the hook contract deployed to goerli -- you can use this hook address or deploy your own!
+    address constant ARBITRUM_POOLMANAGER = address(0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32); // Arbitrum pool manager deployed to GOERLI
+    address USDT = address(0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9); // Mock USDT address
+    address FUSD = address(0x894341be568Eae3697408c420f1d0AcFCE6E55f9); // Mock USDC address
+    address constant HOOK_ADDRESS = address(0x3e17096a281831Af89106c6060D849E21ab24AC0); //address of the hook contract deployed to goerli -- you can use this hook address or deploy your own!
 
-    IPoolManager manager = IPoolManager(GOERLI_POOLMANAGER);
+    IPoolManager manager = IPoolManager(ARBITRUM_POOLMANAGER);
 
     function run() external {
         // sort the tokens!
-        address token0 = uint160(MUSDC_ADDRESS) < uint160(MUNI_ADDRESS) ? MUSDC_ADDRESS : MUNI_ADDRESS;
-        address token1 = uint160(MUSDC_ADDRESS) < uint160(MUNI_ADDRESS) ? MUNI_ADDRESS : MUSDC_ADDRESS;
+        address token0 = uint160(USDT) < uint160(FUSD) ? USDT : FUSD;
+        address token1 = uint160(USDT) < uint160(FUSD) ? FUSD : USDT;
         uint24 swapFee = 4000;
         int24 tickSpacing = 10;
+        // deployCodeTo("lib/v4-core/src/PoolManager.sol", address(ARBITRUM_POOLMANAGER));
 
         // floor(sqrt(1) * 2^96)
         uint160 startingPrice = 79228162514264337593543950336;
@@ -49,6 +52,6 @@ contract CreatePoolScript is Script {
         console.logBytes32(bytes32(idBytes));
 
         vm.broadcast();
-        manager.initialize(pool, startingPrice, hookData);
+        manager.initialize(pool, startingPrice);
     }
 }
