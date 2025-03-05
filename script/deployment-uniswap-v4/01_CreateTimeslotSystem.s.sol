@@ -14,8 +14,6 @@ import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 // forge script script/01_CreatePool.s.sol:CreatePoolScript --private-key <PK> --rpc-url https://arbitrum.rpc.subquery.network/public --etherscan-api-key 6N6Q2DRTUHGIVZ462FXWCX8AW7JPJTZBQ3 --broadcast -vvvv --verify
 contract CreatePoolScript is Script, StdCheats {
     using CurrencyLibrary for Currency;
-
-    //addresses with contracts deployed
     address constant ARBITRUM_POOLMANAGER = address(0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32); // Arbitrum pool manager deployed to GOERLI
     address USDT = address(0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9); // Mock USDT address
     address FUSD = address(0x894341be568Eae3697408c420f1d0AcFCE6E55f9); // Mock USDC address

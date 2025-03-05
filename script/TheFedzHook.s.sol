@@ -2,34 +2,36 @@
 pragma solidity ^0.8.19;
 
 import "forge-std/Script.sol";
-import {Hooks} from "v4-core/src/libraries/Hooks.sol";
-import {PoolManager} from "v4-core/src/PoolManager.sol";
-import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
-import {PoolModifyLiquidityTest} from "v4-core/src/test/PoolModifyLiquidityTest.sol";
-import {PoolSwapTest} from "v4-core/src/test/PoolSwapTest.sol";
-import {PoolDonateTest} from "v4-core/src/test/PoolDonateTest.sol";
+import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {PoolManager} from "@uniswap/v4-core/src/PoolManager.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {PoolModifyLiquidityTest} from "@uniswap/v4-core/src/test/PoolModifyLiquidityTest.sol";
+import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
+import {PoolDonateTest} from "@uniswap/v4-core/src/test/PoolDonateTest.sol";
 import {FedzHook} from "../src/FedzHook.sol";
 import {HookMiner} from "../test/utils/HookMiner.sol";
-import {TimeSlotSystem} from "../src/TimeSlotSystem.sol";
+import {ShuffleingTimeSlotSystem} from "../src/ShuffleingTimeSlotSystem.sol";
 import {MockERC721} from "../src/MockERC721.sol";
 
+// --rpc-url https://arbitrum.rpc.subquery.network/public
+// --etherscan-api-key 6N6Q2DRTUHGIVZ462FXWCX8AW7JPJTZBQ3
+// --verify
 contract TheFedzHookScript is Script {
+
     address constant CREATE2_DEPLOYER = address(0x4e59b44847b379578588920cA78FbF26c0B4956C);
-    address constant SEPOLIA_POOLMANAGER = address(0xc021A7Deb4a939fd7E661a0669faB5ac7Ba2D5d6); //sepolia pool manager deployed to GOERLI
-    address owner = 0x27E20BD50106e3Fbc50A230bd5dC02D7793c7D84;
-    address MOCK_USDT = address(0x0f1D1b7abAeC1Df25f2C4Db751686FC5233f6D3f); // Mock USDT address
-    address MOCK_FUSD = address(0xc7c06a77b481869ecc57E5432D03c3661406424D); // Mock USDC address
+    address constant ARBITRUM_POOLMANAGER = address(0x360E68faCcca8cA495c1B759Fd9EEe466db9FB32); //sepolia pool manager deployed to GOERLI
+    address owner = 0x833e421145863237e9B372dbA99EcF49C98956fb;
+    address MOCK_USDT = address(0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9); // Mock USDT address
+    address MOCK_FUSD = address(0x894341be568Eae3697408c420f1d0AcFCE6E55f9); // Mock USDC address
+    address THE_FEDZ_NFT = 0xE073a53a2Ba1709e2c8F481f1D7dbabA1eF611FD;
     uint256 depegThreshold = 281474976710656; //0.9 USDT per FUSD in Q64.96 format
     address timeSlotSystem; 
-
-
-
 
     function setUp() public {}
 
     function run() public {
          // Retrieve the private key from the environment variable
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        // uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         
         // hook contracts must have specific flags encoded in the address
        uint160 flags = uint160(
@@ -37,30 +39,28 @@ contract TheFedzHookScript is Script {
         );
         
 
-        
-
-        // Deploy the hook using CREATE2
-        // Start broadcasting transactions
-        vm.startBroadcast(deployerPrivateKey);
-        MockERC721 mockNFT = new MockERC721("Fedz Mock NFT" , "Fedz Mock NFT", owner, 'https://fedzfrontend-loris-epfl-loris-epfls-projects.vercel.app/NftPictures/nft_');
-
-        TimeSlotSystem timeSlotSystem = new TimeSlotSystem(
-            1 hours, // slotDuration
-            24 hours, // roundDuration
+        vm.startBroadcast();
+        ShuffleingTimeSlotSystem timeSlotSystem = new ShuffleingTimeSlotSystem(
             owner, // owner
-            address(mockNFT) // nftContract
+            address(THE_FEDZ_NFT) // nftContract
         );
 
-        // Mine a salt that will produce a hook address with the correct flags
+        // // // // Mine a salt that will produce a hook address with the correct flags
         (address hookAddress, bytes32 salt) =
-            HookMiner.find(CREATE2_DEPLOYER, flags, type(FedzHook).creationCode, abi.encode(owner,address(SEPOLIA_POOLMANAGER),owner,MOCK_USDT,MOCK_FUSD,depegThreshold, address(timeSlotSystem)));
+            HookMiner.find(CREATE2_DEPLOYER, flags, type(FedzHook).creationCode, abi.encode(address(ARBITRUM_POOLMANAGER), owner, address(timeSlotSystem)));
+        console.log("this:", address(this));
+        console.log("Hook deployed to:", address(hookAddress));
+        console.log("salt:");
+        console.logBytes32(salt);
+        console.log("this", address(this));
+        FedzHook TheFedzHook = new FedzHook{salt: salt}(IPoolManager(address(ARBITRUM_POOLMANAGER)), owner, address(timeSlotSystem));
+        // console.log("Hook deployed to:", address(TheFedzHook));
+        // console.log("Expected:", address(hookAddress));
+        // require(address(TheFedzHook) == hookAddress, "FedzHookScript: hook address mismatch");
+        // // Log the address of the deployed contract
+        // console.log("Hook deployed to:", address(TheFedzHook));
 
-        FedzHook TheFedzHook = new FedzHook{salt: salt}(owner, IPoolManager(address(SEPOLIA_POOLMANAGER)),owner,MOCK_USDT,MOCK_FUSD,depegThreshold, address(timeSlotSystem));
-        require(address(TheFedzHook) == hookAddress, "FedzHookScript: hook address mismatch");
-        // Log the address of the deployed contract
-        console.log("Hook deployed to:", address(TheFedzHook));
-
-        // Stop broadcasting transactions
+        // // Stop broadcasting transactions
         vm.stopBroadcast();
     }
 }
