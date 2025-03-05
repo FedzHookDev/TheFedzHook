@@ -11,7 +11,7 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {CurrencyLibrary, Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
-import {HookMiner} from "../test/utils/HookMiner.sol";
+import {HookMiner} from "../../test/utils/HookMiner.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {Actions} from "@uniswap/v4-periphery/src/libraries/Actions.sol";
@@ -20,7 +20,7 @@ import {IAllowanceTransfer} from "@uniswap/v4-periphery/lib/permit2/src/interfac
 import {IV4Router} from "@uniswap/v4-periphery/src/interfaces/IV4Router.sol";
 import {IUniversalRouter} from "@uniswap/universal-router/contracts/interfaces/IUniversalRouter.sol";
 import { Commands } from "@uniswap/universal-router/contracts/libraries/Commands.sol";
-import {BaseHookMock} from "../src/BaseHookMock.sol";
+import {BaseHookMock} from "../../src/BaseHookMock.sol";
 
 // forge script script/03_AddLiquidityAndSwapViaEOAWithHook.s.sol:AddLiquidityAndSwapViaEOAWithHook --private-key <PK> --rpc-url https://arbitrum.rpc.subquery.network/public
 // forge script script/03_AddLiquidityAndSwapViaEOAWithHook.s.sol:AddLiquidityAndSwapViaEOAWithHook --rpc-url https://arbitrum.rpc.subquery.network/public

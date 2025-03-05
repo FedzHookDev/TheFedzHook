@@ -12,7 +12,7 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {CurrencyLibrary, Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
-import {HookMiner} from "../test/utils/HookMiner.sol";
+import {HookMiner} from "../../test/utils/HookMiner.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {Actions} from "@uniswap/v4-periphery/src/libraries/Actions.sol";
