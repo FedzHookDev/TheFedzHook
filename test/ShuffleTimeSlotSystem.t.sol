@@ -18,6 +18,7 @@ contract ShuffleTimeSlotSystemTest is Test {
     uint256 constant SLOT_DURATION = 1 hours;
     uint256 constant ROUND_DURATION = 24 hours;
 
+    bytes32 randomSeed;
     function setUp() public {
         owner = makeAddr("OWNER");
         player1 = makeAddr("PLAYER_1");
@@ -25,6 +26,7 @@ contract ShuffleTimeSlotSystemTest is Test {
         player3 = makeAddr("PLAYER_3");
         player4 = makeAddr("PLAYER_4");
 
+        randomSeed = blockhash(block.number-1);
         mockNFT = new TheFedz(owner);
         vm.roll(5);
         timeSlotSystem = new ShuffleTimeSlotSystem(owner, address(mockNFT));
@@ -56,7 +58,8 @@ contract ShuffleTimeSlotSystemTest is Test {
         vm.warp(0);
         uint256 startingTime = block.timestamp + 1 hours;
         uint256 slotDuration = 1 hours;
-        uint256 expcRandom = 90045193541034823946955040002439578345925946192123642160420600331405398852504;
+        uint256 expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(1))));
+
         vm.expectEmit(address(timeSlotSystem));
         emit ITimeSlotSystem.NextRoundAnnouncement(1, expcRandom, startingTime, slotDuration, fisherYatesShuffle(expcRandom));
         vm.prank(owner);
@@ -128,7 +131,7 @@ contract ShuffleTimeSlotSystemTest is Test {
         vm.expectEmit(address(timeSlotSystem));
         emit ITimeSlotSystem.RoundStarted(1, 0, startingTime, slotDuration, 3);
 
-        uint256 expcRandom = 14060197318521799830544281995515102828570105187169927350578527920070012718387;
+        uint256 expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(2))));
         vm.expectEmit(address(timeSlotSystem));
         emit ITimeSlotSystem.NextRoundAnnouncement(2, expcRandom, slotDuration, 14401, fisherYatesShuffle(expcRandom));
 
@@ -141,7 +144,7 @@ contract ShuffleTimeSlotSystemTest is Test {
         // Next round starts here
         vm.expectEmit(address(timeSlotSystem));
         emit ITimeSlotSystem.RoundStarted(2, 0, 14401, slotDuration, 3);
-        expcRandom = 58929516342146752248318105509329355679184442390785039174273888353726450426109;
+        expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(3))));
         vm.expectEmit(address(timeSlotSystem));
         emit ITimeSlotSystem.NextRoundAnnouncement(3, expcRandom, slotDuration, 25201, fisherYatesShuffle(expcRandom));
         vm.warp(block.timestamp + slotDuration);
@@ -154,7 +157,7 @@ contract ShuffleTimeSlotSystemTest is Test {
         // Next round starts here
         vm.expectEmit(address(timeSlotSystem));
         emit ITimeSlotSystem.RoundStarted(3, 1, 25201, slotDuration, 3);
-        expcRandom = 95663239321759996399985236510040750497076662416542587399129177390727309568828;
+        expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(4))));
         vm.expectEmit(address(timeSlotSystem));
         emit ITimeSlotSystem.NextRoundAnnouncement(4, expcRandom, slotDuration, 36001, fisherYatesShuffle(expcRandom));
         vm.warp(block.timestamp + 2 * slotDuration);
@@ -166,7 +169,7 @@ contract ShuffleTimeSlotSystemTest is Test {
         vm.warp(block.timestamp + slotDuration);
         vm.expectEmit(address(timeSlotSystem));
         emit ITimeSlotSystem.RoundStarted(4, 0, 36001, slotDuration, 3);
-        expcRandom = 40484017006162911396215742235401181641635690429308957077172007996218646966913;
+        expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(5))));
         vm.expectEmit(address(timeSlotSystem));
         emit ITimeSlotSystem.NextRoundAnnouncement(5, expcRandom, slotDuration, 46801, fisherYatesShuffle(expcRandom));
         assertEq(timeSlotSystem.getCurrentPlayer(), player3);
