@@ -10,7 +10,7 @@ import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
 import {PoolDonateTest} from "@uniswap/v4-core/src/test/PoolDonateTest.sol";
 import {FedzHook} from "../src/FedzHook.sol";
 import {HookMiner} from "../test/utils/HookMiner.sol";
-import {ShuffleingTimeSlotSystem} from "../src/ShuffleingTimeSlotSystem.sol";
+import {ShuffleTimeSlotSystem} from "../src/ShuffleTimeSlotSystem.sol";
 import {MockERC721} from "../src/MockERC721.sol";
 
 // --rpc-url https://arbitrum.rpc.subquery.network/public
@@ -40,7 +40,7 @@ contract TheFedzHookScript is Script {
         
 
         vm.startBroadcast();
-        ShuffleingTimeSlotSystem timeSlotSystem = new ShuffleingTimeSlotSystem(
+        ShuffleTimeSlotSystem timeSlotSystem = new ShuffleTimeSlotSystem(
             owner, // owner
             address(THE_FEDZ_NFT) // nftContract
         );
