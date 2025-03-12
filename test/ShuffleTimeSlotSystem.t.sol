@@ -3,17 +3,18 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
-import "../src/ShuffleTimeSlotSystem.sol";
+import "../src/ShuffleAccessManager.sol";
 import "../src/MockERC721.sol";
 
 contract ShuffleTimeSlotSystemTest is Test {
-    ShuffleTimeSlotSystem public timeSlotSystem;
+    ShuffleAccessManager public timeSlotSystem;
     TheFedz public mockNFT;
     address public owner;
     address public player1;
     address public player2;
     address public player3;
     address public player4;
+    address public hook;
 
     uint256 constant SLOT_DURATION = 1 hours;
     uint256 constant ROUND_DURATION = 24 hours;
@@ -21,15 +22,16 @@ contract ShuffleTimeSlotSystemTest is Test {
     bytes32 randomSeed;
     function setUp() public {
         owner = makeAddr("OWNER");
-        player1 = makeAddr("PLAYER_1");
-        player2 = makeAddr("PLAYER_2");
-        player3 = makeAddr("PLAYER_3");
+        player1 = makeAddr("ALICE");
+        player2 = makeAddr("BOB");
+        player3 = makeAddr("CHARLEI");
         player4 = makeAddr("PLAYER_4");
+        hook = makeAddr("HOOK");
 
         randomSeed = blockhash(block.number-1);
         mockNFT = new TheFedz(owner);
         vm.roll(5);
-        timeSlotSystem = new ShuffleTimeSlotSystem(owner, address(mockNFT));
+        timeSlotSystem = new ShuffleAccessManager(owner, address(mockNFT));
         // Mint NFTs to players
         //Mint 2 NFTs to player1
         vm.prank(owner);
@@ -43,12 +45,13 @@ contract ShuffleTimeSlotSystemTest is Test {
     }
 
     function test_randomSeed_byDeploymentBlock() public {
-        assertEq(timeSlotSystem.randomSeed(), keccak256(abi.encodePacked(blockhash(block.number-1))));
+        assertEq(timeSlotSystem.randomSeed(), blockhash(block.number-1));
     }
 
     function test_nonRestarted_fresh() public {
         vm.warp(1000);
-        assertEq(timeSlotSystem.getCurrentPlayer(), address(0));
+        address currentPlayer = timeSlotSystem.getCurrentPlayer();
+        assertEq(currentPlayer, address(0));
         assertEq(timeSlotSystem.isActiveOn(block.timestamp), false);
         assertEq(timeSlotSystem.roundStartedAt(), 0);
         assertEq(timeSlotSystem.nextRoundStartAt(), 0);
@@ -61,7 +64,7 @@ contract ShuffleTimeSlotSystemTest is Test {
         uint256 expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(1))));
 
         vm.expectEmit(address(timeSlotSystem));
-        emit ITimeSlotSystem.NextRoundAnnouncement(1, expcRandom, startingTime, slotDuration, fisherYatesShuffle(expcRandom));
+        emit IAccessManager.NextRoundAnnouncement(1, expcRandom, startingTime, slotDuration, fisherYatesShuffle(expcRandom));
         vm.prank(owner);
         timeSlotSystem.restart(startingTime, slotDuration);
         assertEq(timeSlotSystem.isActiveOn(block.timestamp), false);
@@ -82,6 +85,7 @@ contract ShuffleTimeSlotSystemTest is Test {
     }
 
     function test_afterRestartAndBeforeStart() public {
+        vm.warp(10 hours);
         uint256 startingTime = block.timestamp + 1 hours;
         uint256 slotDuration = 1 hours;
         vm.prank(owner);
@@ -106,7 +110,7 @@ contract ShuffleTimeSlotSystemTest is Test {
     }
 
     function test_startNewRoundWithRetroactiveStart_revert() public {
-        vm.warp(10000);
+        vm.warp(10 hours);
         uint256 startingTime = block.timestamp - 1 hours;
         uint256 slotDuration = 1 hours;
         vm.expectRevert("Invalid start time");
@@ -115,6 +119,7 @@ contract ShuffleTimeSlotSystemTest is Test {
     }
 
     function test_restart_firstRestartWithEmptySlotDuration_revert() public {
+        vm.warp(10 hours);
         uint256 startingTime = block.timestamp + 1 hours;
         vm.prank(owner);
         timeSlotSystem.restart(startingTime, 1 hours);
@@ -123,63 +128,104 @@ contract ShuffleTimeSlotSystemTest is Test {
     }
 
     function test_firstAccessAfterRoundStart() public {
-        uint256 startingTime = block.timestamp + 1 hours;
+        uint256 startingTime = ((block.timestamp + 1 hours) - (block.timestamp) % 1 hours) + 1 hours;
         uint256 slotDuration = 1 hours;
+
+        uint256 expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(1))));
+        vm.expectEmit(address(timeSlotSystem));
+        emit IAccessManager.NextRoundAnnouncement(1, expcRandom, slotDuration, startingTime, fisherYatesShuffle(expcRandom));
         vm.prank(owner);
         timeSlotSystem.restart(startingTime, slotDuration);
+
         vm.warp(startingTime);
+        expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(2))));
         vm.expectEmit(address(timeSlotSystem));
-        emit ITimeSlotSystem.RoundStarted(1, 0, startingTime, slotDuration, 3);
+        emit IAccessManager.NextRoundAnnouncement(2, expcRandom, slotDuration, 18000, fisherYatesShuffle(expcRandom));
+        vm.prank(player3);
+        timeSlotSystem.updateState();
+        address currentPlayer = timeSlotSystem.getCurrentPlayer();
+        assertEq(currentPlayer, player3);
 
-        uint256 expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(2))));
-        vm.expectEmit(address(timeSlotSystem));
-        emit ITimeSlotSystem.NextRoundAnnouncement(2, expcRandom, slotDuration, 14401, fisherYatesShuffle(expcRandom));
+        // expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(2))));
+        // vm.expectEmit(address(timeSlotSystem));
+        // emit IAccessManager.NextRoundAnnouncement(2, expcRandom, slotDuration, 18000, fisherYatesShuffle(expcRandom));
+        // vm.prank(player1);
+        // timeSlotSystem.updateState();
+        vm.warp(block.timestamp + slotDuration);
+        vm.prank(player1);
+        timeSlotSystem.updateState();
+        currentPlayer = timeSlotSystem.getCurrentPlayer();
+        assertEq(currentPlayer, player1);
 
-        assertEq(timeSlotSystem.getCurrentPlayer(), player3);
         vm.warp(block.timestamp + slotDuration);
-        assertEq(timeSlotSystem.getCurrentPlayer(), player1);
-        vm.warp(block.timestamp + slotDuration);
-        assertEq(timeSlotSystem.getCurrentPlayer(), player2);
+        vm.prank(player2);
+        timeSlotSystem.updateState();
+        currentPlayer = timeSlotSystem.getCurrentPlayer();
+        assertEq(currentPlayer, player2);
 
         // Next round starts here
-        vm.expectEmit(address(timeSlotSystem));
-        emit ITimeSlotSystem.RoundStarted(2, 0, 14401, slotDuration, 3);
         expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(3))));
         vm.expectEmit(address(timeSlotSystem));
-        emit ITimeSlotSystem.NextRoundAnnouncement(3, expcRandom, slotDuration, 25201, fisherYatesShuffle(expcRandom));
+        emit IAccessManager.NextRoundAnnouncement(3, expcRandom, slotDuration, 28800, fisherYatesShuffle(expcRandom));
         vm.warp(block.timestamp + slotDuration);
-        assertEq(timeSlotSystem.getCurrentPlayer(), player2);
+        vm.prank(player2);
+        timeSlotSystem.updateState();
+        currentPlayer = timeSlotSystem.getCurrentPlayer();
+        assertEq(currentPlayer, player2);
         vm.warp(block.timestamp + slotDuration);
-        assertEq(timeSlotSystem.getCurrentPlayer(), player1);
+        vm.prank(player3);
+        timeSlotSystem.updateState();
+        currentPlayer = timeSlotSystem.getCurrentPlayer();
+        assertEq(currentPlayer, player3);
         vm.warp(block.timestamp + slotDuration);
-        assertEq(timeSlotSystem.getCurrentPlayer(), player3);
+        vm.prank(player1);
+        timeSlotSystem.updateState();
+        currentPlayer = timeSlotSystem.getCurrentPlayer();
+        assertEq(currentPlayer, player1);
 
         // Next round starts here
-        vm.expectEmit(address(timeSlotSystem));
-        emit ITimeSlotSystem.RoundStarted(3, 1, 25201, slotDuration, 3);
         expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(4))));
         vm.expectEmit(address(timeSlotSystem));
-        emit ITimeSlotSystem.NextRoundAnnouncement(4, expcRandom, slotDuration, 36001, fisherYatesShuffle(expcRandom));
+        emit IAccessManager.NextRoundAnnouncement(4, expcRandom, slotDuration, 39600, fisherYatesShuffle(expcRandom));
         vm.warp(block.timestamp + 2 * slotDuration);
-        assertEq(timeSlotSystem.getCurrentPlayer(), player1);
+        vm.prank(player2);
+        timeSlotSystem.updateState();
+        currentPlayer = timeSlotSystem.getCurrentPlayer();
+        assertEq(currentPlayer, player2);
         vm.warp(block.timestamp + slotDuration);
-        assertEq(timeSlotSystem.getCurrentPlayer(), player3);
+        vm.prank(player3);
+        timeSlotSystem.updateState();
+        currentPlayer = timeSlotSystem.getCurrentPlayer();
+        assertEq(currentPlayer, player3);
+        vm.warp(block.timestamp + slotDuration);
+    
+        vm.prank(player3);
+        timeSlotSystem.updateState();
+        currentPlayer = timeSlotSystem.getCurrentPlayer();
+        assertEq(currentPlayer, player3);
+        vm.warp(block.timestamp + slotDuration);
+        currentPlayer = timeSlotSystem.getCurrentPlayer();
+        assertEq(currentPlayer, player2);
+        vm.warp(block.timestamp + slotDuration);
+        currentPlayer = timeSlotSystem.getCurrentPlayer();
+        assertEq(currentPlayer, player1);
 
         // Next round starts here
         vm.warp(block.timestamp + slotDuration);
+        expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(6))));
         vm.expectEmit(address(timeSlotSystem));
-        emit ITimeSlotSystem.RoundStarted(4, 0, 36001, slotDuration, 3);
-        expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(5))));
-        vm.expectEmit(address(timeSlotSystem));
-        emit ITimeSlotSystem.NextRoundAnnouncement(5, expcRandom, slotDuration, 46801, fisherYatesShuffle(expcRandom));
-        assertEq(timeSlotSystem.getCurrentPlayer(), player3);
+        emit IAccessManager.NextRoundAnnouncement(6, expcRandom, slotDuration, 61200, fisherYatesShuffle(expcRandom));
+        vm.prank(player1);
+        timeSlotSystem.updateState();
+        currentPlayer = timeSlotSystem.getCurrentPlayer();
+        assertEq(currentPlayer, player1);
     }
 
     function fisherYatesShuffle(uint256 random) private view returns(uint256[] memory slots) {
         uint256 totalSlots = mockNFT.totalSupply();
         // Fisher-Yates shuffle
         slots = new uint[](totalSlots);
-        for (uint256 i = 0; i < totalSlots-1; i++) {
+        for (uint256 i = 0; i < totalSlots; i++) {
             slots[i] = mockNFT.tokenByIndex(i);
         }
         for (uint256 i = totalSlots - 1; i > 0; i--) {
