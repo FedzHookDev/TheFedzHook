@@ -79,12 +79,21 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
     ////////////////////////////////
     // Internal functions
     ///////////////////////////////
+    function _isAllowed(address caller) internal view returns (bool) {
+        return _getPlayerByTimestamp(block.timestamp) == caller;
+    }
+
+    function _getPlayerByTimestamp(uint256 timestamp) internal view returns (address) {
+        uint tokenIdTurn = getSlotValueByTimestamp(timestamp);
+        return tokenIdTurn > 0 ? nftContract.ownerOf(tokenIdTurn) : address(0);
+    }
+
     function _restart(uint256 startsAt, uint256 slotDuration) internal {
         _prepareNextRoundState(slotDuration, startsAt);
     }
 
     function _getCurrentPlayer() internal view returns (address) {
-        return getPlayerByTimestamp(block.timestamp);
+        return _getPlayerByTimestamp(block.timestamp);
     }
 
     function _prepareNextRoundState(uint256 slotDuration, uint256 startsAt) internal {
@@ -92,19 +101,6 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
         uint256[] memory slots = nftContract.toArrayWithShuffle(random);
         _prepareNextRoundState(slotDuration, startsAt, slots);
         emit NextRoundAnnouncement(nextRound.number, random, nextRound.slotDuration, nextRound.startsAt, nextRound.slots);
-    }
-
-    function _isAllowed(address caller) internal view returns (bool) {
-        return getPlayerByTimestamp(block.timestamp) == caller;
-    }
-
-    function _statefullIsAllowed(address caller) internal view returns (bool) {
-        return getPlayerByTimestamp(block.timestamp) == caller;
-    }
-
-    function _getPlayerByTimestamp(uint256 timestamp) internal view returns (address) {
-        uint tokenIdTurn = getSlotValueByTimestamp(timestamp);
-        return tokenIdTurn > 0 ? nftContract.ownerOf(tokenIdTurn) : address(0);
     }
 
 }

@@ -10,7 +10,7 @@ import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
 import {PoolDonateTest} from "@uniswap/v4-core/src/test/PoolDonateTest.sol";
 import {FedzHook} from "../src/FedzHook.sol";
 import {HookMiner} from "../test/utils/HookMiner.sol";
-import {ShuffleTimeSlotSystem} from "../src/ShuffleTimeSlotSystem.sol";
+import {ShuffleAccessManager} from "../src/ShuffleAccessManager.sol";
 import {MockERC721} from "../src/MockERC721.sol";
 
 // --rpc-url https://arbitrum.rpc.subquery.network/public
@@ -40,14 +40,16 @@ contract TheFedzHookScript is Script {
         
 
         vm.startBroadcast();
-        ShuffleTimeSlotSystem timeSlotSystem = new ShuffleTimeSlotSystem(
+
+
+        // Mine a salt that will produce a hook address with the correct flags
+        (address hookAddress, bytes32 salt) =
+            HookMiner.find(CREATE2_DEPLOYER, flags, type(FedzHook).creationCode, abi.encode(address(ARBITRUM_POOLMANAGER), owner, address(timeSlotSystem)));
+
+        ShuffleAccessManager timeSlotSystem = new ShuffleAccessManager(
             owner, // owner
             address(THE_FEDZ_NFT) // nftContract
         );
-
-        // // // // Mine a salt that will produce a hook address with the correct flags
-        (address hookAddress, bytes32 salt) =
-            HookMiner.find(CREATE2_DEPLOYER, flags, type(FedzHook).creationCode, abi.encode(address(ARBITRUM_POOLMANAGER), owner, address(timeSlotSystem)));
         console.log("this:", address(this));
         console.log("Hook deployed to:", address(hookAddress));
         console.log("salt:");
