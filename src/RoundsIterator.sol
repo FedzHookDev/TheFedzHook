@@ -8,7 +8,6 @@ import {IAccessManager} from "./interfaces/IAccessManager.sol";
 import {TimeSlotLibrary} from "./TimeSlotSystemLibrary.sol";
 import {InfinteRandomLibrary} from "./InfinteRandomLibrary.sol";
 import {ArrayNFTLibrary} from "./ArrayNFTLibrary.sol";
-import {console} from "forge-std/console.sol";
 import {RoundLibrary} from "./RoundLibrary.sol";
 
 
@@ -19,36 +18,8 @@ abstract contract RoundsIterator {
     RoundLibrary.Round public round;
     RoundLibrary.Round public nextRound;
 
-    function _transistState() internal returns (bool affected) {
-        affected = _isNextRoundAlreadyStarted();
-        if (affected) {
-            round = nextRound;
-            delete nextRound;
-        }
-    }
-
-    function _isStateUpToDate() public view returns (bool) {
-        return !_isNextRoundAlreadyStarted();
-    }
-
-    function _isNextRoundAlreadyStarted() public view returns (bool) {
-        return nextRound.startsAt > 0 && block.timestamp >= nextRound.startsAt;
-    }
-
-    function _progressState() internal {
-        require(!_isStateUpToDate(), "State should not progress");
-        round = nextRound;
-        delete nextRound;
-    }
-
-    function _prepareNextRoundState(uint256 slotDuration, uint256 startsAt, uint256[] memory slots) internal {
-        require(startsAt >= block.timestamp, "Invalid start time");
-        require((startsAt - round.startsAt) % slotDuration == 0, "Invalid start time: not aligned with slot duration");
-        if (round.isRunning()) {
-            nextRound = round.nextRound(slots);
-        } else {
-            nextRound.init(slots, startsAt, slotDuration);
-        }
+    function isRoundLocked() external view returns (bool) {
+        return _isLocked();
     }
 
     function getSlotValueByTimestamp(uint256 timestamp) public view returns (uint256 tokenId) {
@@ -84,12 +55,34 @@ abstract contract RoundsIterator {
         return false;
     }
 
+    function nextSlotDuration() public view returns (uint256) {
+        return nextRound.slotDuration;
+    }
+
+    function _unlockRound() internal returns (bool affected) {
+        affected = _isLocked();
+        if (affected) {
+            round = nextRound;
+            delete nextRound;
+        }
+    }
+
     function _getCurrentRound() internal view returns (RoundLibrary.Round memory) {
         return nextRound.startsAt == 0 || block.timestamp < nextRound.startsAt ? round : nextRound;
     }
 
-    function nextSlotDuration() public view returns (uint256) {
-        return nextRound.slotDuration;
+    function _isLocked() internal view returns (bool) {
+        return nextRound.startsAt > 0 && block.timestamp >= nextRound.startsAt;
+    }
+
+    function _prepareNextRoundState(uint256 slotDuration, uint256 startsAt, uint256[] memory slots) internal {
+        require(startsAt >= block.timestamp, "Invalid start time");
+        require((startsAt - round.startsAt) % slotDuration == 0, "Invalid start time: not aligned with slot duration");
+        if (round.isRunning()) {
+            nextRound = round.nextRound(slots);
+        } else {
+            nextRound.init(slots, startsAt, slotDuration);
+        }
     }
 
 }

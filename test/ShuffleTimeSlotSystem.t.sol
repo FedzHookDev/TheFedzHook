@@ -142,7 +142,7 @@ contract ShuffleTimeSlotSystemTest is Test {
         vm.expectEmit(address(timeSlotSystem));
         emit IAccessManager.NextRoundAnnouncement(2, expcRandom, slotDuration, 18000, fisherYatesShuffle(expcRandom));
         vm.prank(player3);
-        timeSlotSystem.updateState();
+        timeSlotSystem.unlockRound();
         address currentPlayer = timeSlotSystem.getCurrentPlayer();
         assertEq(currentPlayer, player3);
 
@@ -153,13 +153,13 @@ contract ShuffleTimeSlotSystemTest is Test {
         // timeSlotSystem.updateState();
         vm.warp(block.timestamp + slotDuration);
         vm.prank(player1);
-        timeSlotSystem.updateState();
+        timeSlotSystem.unlockRound();
         currentPlayer = timeSlotSystem.getCurrentPlayer();
         assertEq(currentPlayer, player1);
 
         vm.warp(block.timestamp + slotDuration);
         vm.prank(player2);
-        timeSlotSystem.updateState();
+        timeSlotSystem.unlockRound();
         currentPlayer = timeSlotSystem.getCurrentPlayer();
         assertEq(currentPlayer, player2);
 
@@ -169,17 +169,17 @@ contract ShuffleTimeSlotSystemTest is Test {
         emit IAccessManager.NextRoundAnnouncement(3, expcRandom, slotDuration, 28800, fisherYatesShuffle(expcRandom));
         vm.warp(block.timestamp + slotDuration);
         vm.prank(player2);
-        timeSlotSystem.updateState();
+        timeSlotSystem.unlockRound();
         currentPlayer = timeSlotSystem.getCurrentPlayer();
         assertEq(currentPlayer, player2);
         vm.warp(block.timestamp + slotDuration);
         vm.prank(player3);
-        timeSlotSystem.updateState();
+        timeSlotSystem.unlockRound();
         currentPlayer = timeSlotSystem.getCurrentPlayer();
         assertEq(currentPlayer, player3);
         vm.warp(block.timestamp + slotDuration);
         vm.prank(player1);
-        timeSlotSystem.updateState();
+        timeSlotSystem.unlockRound();
         currentPlayer = timeSlotSystem.getCurrentPlayer();
         assertEq(currentPlayer, player1);
 
@@ -189,18 +189,18 @@ contract ShuffleTimeSlotSystemTest is Test {
         emit IAccessManager.NextRoundAnnouncement(4, expcRandom, slotDuration, 39600, fisherYatesShuffle(expcRandom));
         vm.warp(block.timestamp + 2 * slotDuration);
         vm.prank(player2);
-        timeSlotSystem.updateState();
+        timeSlotSystem.unlockRound();
         currentPlayer = timeSlotSystem.getCurrentPlayer();
         assertEq(currentPlayer, player2);
         vm.warp(block.timestamp + slotDuration);
         vm.prank(player3);
-        timeSlotSystem.updateState();
+        timeSlotSystem.unlockRound();
         currentPlayer = timeSlotSystem.getCurrentPlayer();
         assertEq(currentPlayer, player3);
         vm.warp(block.timestamp + slotDuration);
     
         vm.prank(player3);
-        timeSlotSystem.updateState();
+        timeSlotSystem.unlockRound();
         currentPlayer = timeSlotSystem.getCurrentPlayer();
         assertEq(currentPlayer, player3);
         vm.warp(block.timestamp + slotDuration);
@@ -216,7 +216,7 @@ contract ShuffleTimeSlotSystemTest is Test {
         vm.expectEmit(address(timeSlotSystem));
         emit IAccessManager.NextRoundAnnouncement(6, expcRandom, slotDuration, 61200, fisherYatesShuffle(expcRandom));
         vm.prank(player1);
-        timeSlotSystem.updateState();
+        timeSlotSystem.unlockRound();
         currentPlayer = timeSlotSystem.getCurrentPlayer();
         assertEq(currentPlayer, player1);
     }

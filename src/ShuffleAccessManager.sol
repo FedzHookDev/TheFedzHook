@@ -34,7 +34,7 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
     }
 
     function isAllowed(address caller) external view returns (bool res) {
-        if (!_isStateUpToDate()) {
+        if (_isLocked()) {
             return false;
         }
         return _isAllowed(caller);
@@ -45,7 +45,7 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
     }
 
     function getCurrentPlayer() public view returns (address res) {
-        if (!_isStateUpToDate()) {
+        if (_isLocked()) {
             return address(0);
         }
         return _getCurrentPlayer();
@@ -70,8 +70,8 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
         nftContract = TheFedz(_nftContract);
     }
 
-    function updateState() external onlyAllowed {
-        if (_transistState()) {
+    function unlockRound() external onlyAllowed {
+        if (_unlockRound()) {
             _prepareNextRoundState(round.slotDuration, round.endsInOrLaterThen());
         }
     }
