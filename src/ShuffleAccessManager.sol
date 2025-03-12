@@ -33,10 +33,6 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
         _;
     }
 
-    function restart(uint256 startsAt, uint256 slotDuration) external onlyOwner {
-        _restart(startsAt, slotDuration);
-    }
-
     function isAllowed(address caller) external view returns (bool res) {
         if (!_isStateUpToDate()) {
             return false;
@@ -59,16 +55,31 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
         return _getCurrentPlayer();
     }
 
+    function getPlayerByTimestamp(uint256 timestamp) public view returns (address) {
+        return _getPlayerByTimestamp(timestamp);
+    }
+
     function updateState() external onlyAllowed {
         if (_transistState()) {
             _prepareNextRoundState(round.slotDuration, round.endsInOrLaterThen());
         }
     }
 
-    function getPlayerByTimestamp(uint256 timestamp) public view returns (address) {
-        return _getPlayerByTimestamp(timestamp);
+    ////////////////////////
+    // Admin functions
+    ///////////////////////
+    function restart(uint256 startsAt, uint256 slotDuration) external onlyOwner {
+        _restart(startsAt, slotDuration);
     }
 
+    function setNFTContract(address _nftContract) external onlyOwner {
+        nftContract = TheFedz(_nftContract);
+    }
+
+
+    ////////////////////////
+    // Internal functions
+    ///////////////////////
     function _restart(uint256 startsAt, uint256 slotDuration) internal {
         _prepareNextRoundState(slotDuration, startsAt);
     }
@@ -97,7 +108,4 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
         return tokenIdTurn > 0 ? nftContract.ownerOf(tokenIdTurn) : address(0);
     }
 
-    function setNFTContract(address _nftContract) external onlyOwner {
-        nftContract = TheFedz(_nftContract);
-    }
 }
