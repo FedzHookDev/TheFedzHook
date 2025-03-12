@@ -59,12 +59,6 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
         return _getPlayerByTimestamp(timestamp);
     }
 
-    function updateState() external onlyAllowed {
-        if (_transistState()) {
-            _prepareNextRoundState(round.slotDuration, round.endsInOrLaterThen());
-        }
-    }
-
     ////////////////////////
     // Admin functions
     ///////////////////////
@@ -74,6 +68,12 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
 
     function setNFTContract(address _nftContract) external onlyOwner {
         nftContract = TheFedz(_nftContract);
+    }
+
+    function updateState() external onlyAllowed {
+        if (_transistState()) {
+            _prepareNextRoundState(round.slotDuration, round.endsInOrLaterThen());
+        }
     }
 
     ////////////////////////////////
