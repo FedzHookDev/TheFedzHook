@@ -76,10 +76,9 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
         nftContract = TheFedz(_nftContract);
     }
 
-
-    ////////////////////////
+    ////////////////////////////////
     // Internal functions
-    ///////////////////////
+    ///////////////////////////////
     function _restart(uint256 startsAt, uint256 slotDuration) internal {
         _prepareNextRoundState(slotDuration, startsAt);
     }
