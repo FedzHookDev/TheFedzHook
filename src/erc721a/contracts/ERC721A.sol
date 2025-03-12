@@ -5,7 +5,6 @@
 pragma solidity ^0.8.4;
 
 import './IERC721A.sol';
-import {console} from "forge-std/console.sol";
 
 /**
  * @dev Interface of ERC721 token receiver.

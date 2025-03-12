@@ -5,10 +5,12 @@ import "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import "../src/ShuffleAccessManager.sol";
 import "../src/MockERC721.sol";
+import {ITheFedz} from "../src/interfaces/ITheFedz.sol";
+import {TheFedz} from "../src/TheFedz.sol";
 
 contract ShuffleTimeSlotSystemTest is Test {
     ShuffleAccessManager public timeSlotSystem;
-    TheFedz public mockNFT;
+    ITheFedz public mockNFT;
     address public owner;
     address public player1;
     address public player2;
@@ -29,7 +31,7 @@ contract ShuffleTimeSlotSystemTest is Test {
         hook = makeAddr("HOOK");
 
         randomSeed = blockhash(block.number-1);
-        mockNFT = new TheFedz(owner);
+        mockNFT = ITheFedz(address(new TheFedz(owner)));
         vm.roll(5);
         timeSlotSystem = new ShuffleAccessManager(owner, address(mockNFT));
         // Mint NFTs to players

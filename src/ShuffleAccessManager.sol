@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import {TheFedz} from "./TheFedz.sol";
+import {ITheFedz} from "./interfaces/ITheFedz.sol";
 import {IAccessManager} from "./interfaces/IAccessManager.sol";
 import {ITimeSlotSystem} from "./interfaces/ITimeSlotSystem.sol";
 
@@ -15,14 +15,14 @@ import {RoundsIterator} from "./RoundsIterator.sol";
 contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator, Ownable {
 
     using InfinteRandomLibrary for bytes32;
-    using ArrayNFTLibrary for TheFedz;
+    using ArrayNFTLibrary for ITheFedz;
     using RoundLibrary for RoundLibrary.Round;
 
-    TheFedz public nftContract;
+    ITheFedz public nftContract;
     bytes32 public randomSeed;
 
     constructor(address _owner, address _nftContract) Ownable(_owner) {
-        nftContract = TheFedz(_nftContract);
+        nftContract = ITheFedz(_nftContract);
         randomSeed = blockhash(block.number-1);
     }
 
@@ -67,7 +67,7 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
     }
 
     function setNFTContract(address _nftContract) external onlyOwner {
-        nftContract = TheFedz(_nftContract);
+        nftContract = ITheFedz(_nftContract);
     }
 
     function unlockRound() external onlyAllowed {
