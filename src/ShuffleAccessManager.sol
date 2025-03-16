@@ -42,11 +42,10 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
     }
 
     function getCurrentPlayer() external view returns (address res) {
-        return _getCurrentPlayer(false);
-    }
-
-    function getCurrentPlayer(bool unlockMode) external view returns (address) {
-        return _getCurrentPlayer(unlockMode);
+        if (_isLocked()) {
+            return address(0);
+        }
+        return _getCurrentPlayer();
     }
 
     function getPlayerByTimestamp(uint256 timestamp) public view returns (address) {
@@ -89,10 +88,7 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
         _prepareNextRoundState(slotDuration, startsAt);
     }
 
-    function _getCurrentPlayer(bool unlockedMode) internal view returns (address) {
-        if (!unlockedMode && _isLocked()) {
-            return address(0);
-        }
+    function _getCurrentPlayer() internal view returns (address) {
         return _getPlayerByTimestamp(block.timestamp);
     }
 
