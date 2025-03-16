@@ -139,7 +139,7 @@ contract ShuffleTimeSlotSystemTest is Test {
         vm.prank(owner);
         timeSlotSystem.restart(startingTime, slotDuration);
 
-        vm.warp(startingTime);
+        vm.warp(startingTime + 1 minutes);
         expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(2))));
         vm.expectEmit(address(timeSlotSystem));
         emit IAccessManager.NextRoundAnnouncement(2, expcRandom, slotDuration, 18000, fisherYatesShuffle(expcRandom));

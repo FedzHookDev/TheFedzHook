@@ -30,14 +30,14 @@ library RoundLibrary {
         return self.slots[slotByTimestamp(self, block.timestamp)];
     }
 
-    function slotByTimestamp(Round memory self, uint256 timestamp) public view returns (uint256) {
+    function slotByTimestamp(Round memory self, uint256 timestamp) public pure returns (uint256) {
         return ((timestamp - self.startsAt) / self.slotDuration) % self.slots.length;
     }
 
     function endsInOrLaterThen(Round storage self) public view returns (uint256) {
-        uint256 cur = currentSlot(self);
-        uint256 slotsLeft = self.slots.length - cur;
-        return block.timestamp + slotsLeft * self.slotDuration;
+        uint256 slotDuration = self.slotDuration;
+        uint256 slotsLeft = self.slots.length - currentSlot(self);
+        return (block.timestamp - (block.timestamp % slotDuration)) + slotsLeft * slotDuration;
     }
 
     function init(Round storage self, uint256[] memory turnOrder, uint256 startsAt, uint256 slotDuration) internal {
@@ -47,10 +47,10 @@ library RoundLibrary {
         self.number = 1;
     }
 
-    function nextRound(Round storage self, uint256[] memory turnOrder) internal returns (Round memory nextRound) {
-        nextRound.startsAt = endsInOrLaterThen(self);
-        nextRound.slotDuration = self.slotDuration;
-        nextRound.number = self.number+1;
-        nextRound.slots = turnOrder;
+    function nextRound(Round storage self, uint256[] memory turnOrder) internal view returns (Round memory next) {
+        next.startsAt = endsInOrLaterThen(self);
+        next.slotDuration = self.slotDuration;
+        next.number = self.number+1;
+        next.slots = turnOrder;
     }
 }
