@@ -26,33 +26,27 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
         randomSeed = blockhash(block.number-1);
     }
 
-    modifier onlyAllowed() {
-        if (!_isAllowed(msg.sender)) {
+    modifier onlyAllowedToUnlock() {
+        if (!_isAllowed(true, msg.sender)) {
             revert NotAllowed(msg.sender);
         }
         _;
     }
 
     function isAllowed(address caller) external view returns (bool res) {
-        if (_isLocked()) {
-            return false;
-        }
-        return _isAllowed(caller);
+        return _isAllowed(false, caller);
     }
 
-    function isAllowedAfterStateUpdate(address caller) external view returns (bool res) {
-        return _isAllowed(caller);
+    function isAllowed(bool unlockMode, address caller) external view returns (bool res) {
+        return _isAllowed(unlockMode, caller);
     }
 
-    function getCurrentPlayer() public view returns (address res) {
-        if (_isLocked()) {
-            return address(0);
-        }
-        return _getCurrentPlayer();
+    function getCurrentPlayer() external view returns (address res) {
+        return _getCurrentPlayer(false);
     }
 
-    function getCurrentPlayerAfterStateUpdate() public view returns (address) {
-        return _getCurrentPlayer();
+    function getCurrentPlayer(bool unlockMode) external view returns (address) {
+        return _getCurrentPlayer(unlockMode);
     }
 
     function getPlayerByTimestamp(uint256 timestamp) public view returns (address) {
@@ -70,7 +64,7 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
         nftContract = ITheFedz(_nftContract);
     }
 
-    function unlockRound() external onlyAllowed {
+    function unlockRound() external onlyAllowedToUnlock {
         if (_unlockRound()) {
             _prepareNextRoundState(round.slotDuration, round.endsInOrLaterThen());
         }
@@ -79,7 +73,10 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
     ////////////////////////////////
     // Internal functions
     ///////////////////////////////
-    function _isAllowed(address caller) internal view returns (bool) {
+    function _isAllowed(bool unlockMode, address caller) internal view returns (bool) {
+        if (!unlockMode && _isLocked()) {
+            return false;
+        }
         return _getPlayerByTimestamp(block.timestamp) == caller;
     }
 
@@ -92,7 +89,10 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
         _prepareNextRoundState(slotDuration, startsAt);
     }
 
-    function _getCurrentPlayer() internal view returns (address) {
+    function _getCurrentPlayer(bool unlockedMode) internal view returns (address) {
+        if (!unlockedMode && _isLocked()) {
+            return address(0);
+        }
         return _getPlayerByTimestamp(block.timestamp);
     }
 
