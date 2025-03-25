@@ -10,79 +10,75 @@ import {InfinteRandomLibrary} from "./InfinteRandomLibrary.sol";
 import {ArrayNFTLibrary} from "./ArrayNFTLibrary.sol";
 import {RoundLibrary} from "./RoundLibrary.sol";
 
-
 abstract contract RoundsIterator {
 
     using RoundLibrary for RoundLibrary.Round;
         
-    RoundLibrary.Round public round;
-    RoundLibrary.Round public nextRound;
+    RoundLibrary.Round round;
+    RoundLibrary.Round nextRound;
 
-    function isRoundLocked() external view returns (bool) {
-        return _isLocked();
+    struct RoundDescriptor {
+        uint256 roundNumber;
+        uint256 slotDuration;
+        uint256 startsAt;
+        uint256 playersCount;
     }
 
-    function getSlotValueByTimestamp(uint256 timestamp) public view returns (uint256 tokenId) {
-        if (!isActiveOn(timestamp)) {
-            return 0;
-        }
-        RoundLibrary.Round memory r = _getCurrentRound();
-        tokenId = r.currentSlotValue();
+    function rounds() external view returns (RoundDescriptor memory current, RoundDescriptor memory next) {
+        current = _describe(_currentRound());
+        next = _describe(_nextRound());
     }
 
-    function roundStartedAt() public view returns (uint256) {
-        return nextRound.startsAt > 0 && block.timestamp >= nextRound.startsAt ? nextRound.startsAt : round.startsAt;
-    }
-
-    function nextRoundStartAt() public view returns (uint256) {
-        if (nextRound.startsAt > block.timestamp) {
-            return nextRound.startsAt;
-        }
-        return 0;
-    }
-
-    function isStarted() public view returns (bool) {
-        return isActiveOn(block.timestamp);
-    }
-
-    function isActiveOn(uint timestamp) public view returns (bool) {
-        if (nextRound.startsAt > 0 && timestamp >= nextRound.startsAt) {
-            return true;
-        }
-        if (round.startsAt > 0 && timestamp >= round.startsAt) {
-            return true;
-        }
-        return false;
-    }
-
-    function nextSlotDuration() public view returns (uint256) {
-        return nextRound.slotDuration;
-    }
-
-    function _unlockRound() internal returns (bool affected) {
-        affected = _isLocked();
-        if (affected) {
-            round = nextRound;
-            delete nextRound;
-        }
-    }
-
-    function _getCurrentRound() internal view returns (RoundLibrary.Round memory) {
+    function _currentRound() internal view returns (RoundLibrary.Round memory) {
         return nextRound.startsAt == 0 || block.timestamp < nextRound.startsAt ? round : nextRound;
+    }
+
+    function _nextRound() internal view returns (RoundLibrary.Round memory next) {
+        if (nextRound.startsAt > 0 && block.timestamp < nextRound.startsAt) {
+            return nextRound;
+        }
+    }
+
+    function _restart(uint256 startsAt, uint256 slotDuration, uint256[] memory slots) internal returns (uint256) {
+        require(startsAt >= block.timestamp, "Invalid start time");
+        require((startsAt - round.startsAt) % slotDuration == 0, "Invalid start time: not aligned with slot duration");
+        nextRound.init(slots, startsAt, slotDuration);
+        return nextRound.number;
+    }
+
+    function _setNextRound(uint256[] memory slots) internal returns (RoundLibrary.Round memory nextRoundMem) {
+        nextRoundMem = round.nextRound(slots);
+        nextRound = nextRoundMem;
+        return nextRoundMem;
     }
 
     function _isLocked() internal view returns (bool) {
         return nextRound.startsAt > 0 && block.timestamp >= nextRound.startsAt;
     }
 
-    function _prepareNextRoundState(uint256 slotDuration, uint256 startsAt, uint256[] memory slots) internal {
-        require(startsAt >= block.timestamp, "Invalid start time");
-        require((startsAt - round.startsAt) % slotDuration == 0, "Invalid start time: not aligned with slot duration");
-        if (round.isRunning()) {
-            nextRound = round.nextRound(slots);
-        } else {
-            nextRound.init(slots, startsAt, slotDuration);
-        }
+    function _unlockRound() internal {
+        require(_isLocked(), "Round is not locked");
+        round = nextRound;
+        delete nextRound;
     }
 
+    function _getSlotValueByTimestamp(uint256 timestamp) internal view returns (uint256 val) {
+        RoundLibrary.Round memory r = _getRoundByTimestamp(timestamp);
+        val = r.valueByTimestamp(timestamp);
+    }
+
+    function _getCurrentRound() internal view returns (RoundLibrary.Round memory) {
+        return _getRoundByTimestamp(block.timestamp);
+    }
+
+    function _getRoundByTimestamp(uint timestamp) internal view returns (RoundLibrary.Round memory) {
+        return nextRound.startsAt == 0 || timestamp < nextRound.startsAt ? round : nextRound;
+    }
+
+    function _describe(RoundLibrary.Round memory r) internal view returns (RoundDescriptor memory d) {
+        d.roundNumber = r.number;
+        d.slotDuration = r.slotDuration;
+        d.startsAt = r.startsAt;
+        d.playersCount = r.slots.length;
+    }
 }

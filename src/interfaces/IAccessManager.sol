@@ -8,5 +8,4 @@ interface IAccessManager {
 
     error NotAllowed(address caller);
 
-    function isAllowed(address _caller) external view returns (bool res);
 }

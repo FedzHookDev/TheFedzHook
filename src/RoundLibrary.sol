@@ -22,15 +22,26 @@ library RoundLibrary {
         return self.startsAt > 0 && block.timestamp >= self.startsAt;
     }
 
+    function currentValue(Round memory self) public view returns (uint256) {
+        return self.slots[slotByTimestamp(self, block.timestamp)];
+    }
+
     function currentSlot(Round memory self) public view returns (uint256) {
         return slotByTimestamp(self, block.timestamp);
     }
 
-    function currentSlotValue(Round memory self) public view returns (uint256) {
-        return self.slots[slotByTimestamp(self, block.timestamp)];
+    function valueByTimestamp(Round memory self, uint256 timestamp) public pure returns (uint256) {
+        uint256 slot = slotByTimestamp(self, timestamp);
+        if (self.slots.length <= slot) {
+            return 0;
+        }
+        return self.slots[slotByTimestamp(self, timestamp)];
     }
 
     function slotByTimestamp(Round memory self, uint256 timestamp) public pure returns (uint256) {
+        if (self.slotDuration == 0) {
+            return 0;
+        }
         return ((timestamp - self.startsAt) / self.slotDuration) % self.slots.length;
     }
 

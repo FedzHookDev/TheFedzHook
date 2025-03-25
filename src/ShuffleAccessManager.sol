@@ -12,6 +12,7 @@ import {ArrayNFTLibrary} from "./ArrayNFTLibrary.sol";
 import {RoundLibrary} from "./RoundLibrary.sol";
 import {RoundsIterator} from "./RoundsIterator.sol";
 
+
 contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator, Ownable {
 
     using InfinteRandomLibrary for bytes32;
@@ -27,18 +28,21 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
     }
 
     modifier onlyAllowedToUnlock() {
-        if (!_isAllowed(true, msg.sender)) {
+        if (_getPlayerByTimestamp(block.timestamp) != msg.sender) {
             revert NotAllowed(msg.sender);
         }
         _;
     }
 
-    function isAllowed(address caller) external view returns (bool res) {
-        return _isAllowed(false, caller);
+    function isLocked() external view returns (bool) {
+        return _isLocked();
     }
 
-    function isAllowed(bool unlockMode, address caller) external view returns (bool res) {
-        return _isAllowed(unlockMode, caller);
+    function unlockRound() external onlyAllowedToUnlock {
+        _unlockRound();
+        (uint256 random, uint256[] memory slots) = _prepareNextRound();
+        _setNextRound(slots);
+        emit NextRoundAnnouncement(nextRound.number, random, nextRound.slotDuration, nextRound.startsAt, slots);
     }
 
     function getCurrentPlayer() external view returns (address res) {
@@ -63,40 +67,26 @@ contract ShuffleAccessManager is ITimeSlotSystem, IAccessManager, RoundsIterator
         nftContract = ITheFedz(_nftContract);
     }
 
-    function unlockRound() external onlyAllowedToUnlock {
-        if (_unlockRound()) {
-            _prepareNextRoundState(round.slotDuration, round.endsInOrLaterThen());
-        }
-    }
-
     ////////////////////////////////
     // Internal functions
     ///////////////////////////////
-    function _isAllowed(bool unlockMode, address caller) internal view returns (bool) {
-        if (!unlockMode && _isLocked()) {
-            return false;
-        }
-        return _getPlayerByTimestamp(block.timestamp) == caller;
+    function _restart(uint256 startsAt, uint256 slotDuration) internal {
+        (uint256 random, uint256[] memory slots) = _prepareNextRound();
+        uint256 roundNumber = _restart(startsAt, slotDuration, slots);
+        emit NextRoundAnnouncement(roundNumber, random, slotDuration, startsAt, slots);
     }
 
     function _getPlayerByTimestamp(uint256 timestamp) internal view returns (address) {
-        uint tokenIdTurn = getSlotValueByTimestamp(timestamp);
+        uint tokenIdTurn = _getSlotValueByTimestamp(timestamp);
         return tokenIdTurn > 0 ? nftContract.ownerOf(tokenIdTurn) : address(0);
-    }
-
-    function _restart(uint256 startsAt, uint256 slotDuration) internal {
-        _prepareNextRoundState(slotDuration, startsAt);
     }
 
     function _getCurrentPlayer() internal view returns (address) {
         return _getPlayerByTimestamp(block.timestamp);
     }
 
-    function _prepareNextRoundState(uint256 slotDuration, uint256 startsAt) internal {
-        uint256 random = randomSeed.gen(round.number+1);
-        uint256[] memory slots = nftContract.toArrayWithShuffle(random);
-        _prepareNextRoundState(slotDuration, startsAt, slots);
-        emit NextRoundAnnouncement(nextRound.number, random, nextRound.slotDuration, nextRound.startsAt, nextRound.slots);
+    function _prepareNextRound() internal returns (uint256 random, uint256[] memory slots) {
+        random = randomSeed.gen(round.number+1);
+        slots = nftContract.toArrayWithShuffle(random);
     }
-
 }

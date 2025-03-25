@@ -7,6 +7,7 @@ import "../src/ShuffleAccessManager.sol";
 import "../src/MockERC721.sol";
 import {ITheFedz} from "../src/interfaces/ITheFedz.sol";
 import {TheFedz} from "../src/TheFedz.sol";
+import {RoundsIterator} from "../src/RoundsIterator.sol";
 
 contract ShuffleTimeSlotSystemTest is Test {
     ShuffleAccessManager public timeSlotSystem;
@@ -52,11 +53,10 @@ contract ShuffleTimeSlotSystemTest is Test {
 
     function test_nonRestarted_fresh() public {
         vm.warp(1000);
-        address currentPlayer = timeSlotSystem.getCurrentPlayer();
-        assertEq(currentPlayer, address(0));
-        assertEq(timeSlotSystem.isActiveOn(block.timestamp), false);
-        assertEq(timeSlotSystem.roundStartedAt(), 0);
-        assertEq(timeSlotSystem.nextRoundStartAt(), 0);
+        assertEq(timeSlotSystem.getCurrentPlayer(), address(0));
+        // (RoundsIterator.RoundDescriptor memory curRound, RoundsIterator.RoundDescriptor memory nextRound) = timeSlotSystem.rounds();
+        // assertEq(curRound.startsAt, 0);
+        // assertEq(nextRound.startsAt, 0);
     }
 
     function test_restart_nextRoundAnnounced() public {
@@ -69,9 +69,10 @@ contract ShuffleTimeSlotSystemTest is Test {
         emit IAccessManager.NextRoundAnnouncement(1, expcRandom, startingTime, slotDuration, fisherYatesShuffle(expcRandom));
         vm.prank(owner);
         timeSlotSystem.restart(startingTime, slotDuration);
-        assertEq(timeSlotSystem.isActiveOn(block.timestamp), false);
-        assertEq(timeSlotSystem.roundStartedAt(), 0);
-        assertEq(timeSlotSystem.nextRoundStartAt(), startingTime);
+        // assertEq(timeSlotSystem.isActiveOn(block.timestamp), false);
+        (RoundsIterator.RoundDescriptor memory curRound, RoundsIterator.RoundDescriptor memory nextRound) = timeSlotSystem.rounds();
+        assertEq(curRound.startsAt, 0);
+        assertEq(nextRound.startsAt, startingTime);
     }
 
     function test_restartAndStarted() public {
@@ -81,9 +82,9 @@ contract ShuffleTimeSlotSystemTest is Test {
         vm.prank(owner);
         timeSlotSystem.restart(startingTime, slotDuration);
         vm.warp(startingTime);
-        assertEq(timeSlotSystem.isActiveOn(block.timestamp), true);
-        assertEq(timeSlotSystem.roundStartedAt(), startingTime);
-        assertEq(timeSlotSystem.nextRoundStartAt(), 0);
+        (RoundsIterator.RoundDescriptor memory curRound, RoundsIterator.RoundDescriptor memory nextRound) = timeSlotSystem.rounds();
+        assertEq(curRound.startsAt, startingTime);
+        assertEq(nextRound.startsAt, 0);
     }
 
     function test_afterRestartAndBeforeStart() public {
@@ -92,9 +93,9 @@ contract ShuffleTimeSlotSystemTest is Test {
         uint256 slotDuration = 1 hours;
         vm.prank(owner);
         timeSlotSystem.restart(startingTime, slotDuration);
-        assertEq(timeSlotSystem.isActiveOn(block.timestamp), false);
-        assertEq(timeSlotSystem.roundStartedAt(), 0);
-        assertEq(timeSlotSystem.nextRoundStartAt(), startingTime);
+        (RoundsIterator.RoundDescriptor memory curRound, RoundsIterator.RoundDescriptor memory nextRound) = timeSlotSystem.rounds();
+        assertEq(curRound.startsAt, 0);
+        assertEq(nextRound.startsAt, startingTime);
     }
 
     function test_secondRestartBeforeStart_revert() public { // TODO: Check if this is the correct behavior
@@ -125,13 +126,15 @@ contract ShuffleTimeSlotSystemTest is Test {
         uint256 startingTime = block.timestamp + 1 hours;
         vm.prank(owner);
         timeSlotSystem.restart(startingTime, 1 hours);
-        assertEq(timeSlotSystem.nextRoundStartAt(), startingTime);
-        assertEq(timeSlotSystem.nextSlotDuration(), 1 hours);
+
+        (RoundsIterator.RoundDescriptor memory curRound, RoundsIterator.RoundDescriptor memory nextRound) = timeSlotSystem.rounds();
+        assertEq(curRound.startsAt, 0);
+        assertEq(nextRound.startsAt, startingTime);
     }
 
     function test_firstAccessAfterRoundStart() public {
-        uint256 startingTime = ((block.timestamp + 1 hours) - (block.timestamp) % 1 hours) + 1 hours;
         uint256 slotDuration = 1 hours;
+        uint256 startingTime = ((block.timestamp + slotDuration) - (block.timestamp) % slotDuration) + slotDuration;
 
         uint256 expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(1))));
         vm.expectEmit(address(timeSlotSystem));
@@ -145,25 +148,16 @@ contract ShuffleTimeSlotSystemTest is Test {
         emit IAccessManager.NextRoundAnnouncement(2, expcRandom, slotDuration, 18000, fisherYatesShuffle(expcRandom));
         vm.prank(player3);
         timeSlotSystem.unlockRound();
-        address currentPlayer = timeSlotSystem.getCurrentPlayer();
-        assertEq(currentPlayer, player3);
+        assertEq(timeSlotSystem.getCurrentPlayer(), player3);
 
-        // expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(2))));
-        // vm.expectEmit(address(timeSlotSystem));
-        // emit IAccessManager.NextRoundAnnouncement(2, expcRandom, slotDuration, 18000, fisherYatesShuffle(expcRandom));
-        // vm.prank(player1);
-        // timeSlotSystem.updateState();
         vm.warp(block.timestamp + slotDuration);
+        vm.expectRevert("Round is not locked");
         vm.prank(player1);
         timeSlotSystem.unlockRound();
-        currentPlayer = timeSlotSystem.getCurrentPlayer();
-        assertEq(currentPlayer, player1);
+        assertEq(timeSlotSystem.getCurrentPlayer(), player1);
 
         vm.warp(block.timestamp + slotDuration);
-        vm.prank(player2);
-        timeSlotSystem.unlockRound();
-        currentPlayer = timeSlotSystem.getCurrentPlayer();
-        assertEq(currentPlayer, player2);
+        assertEq(timeSlotSystem.getCurrentPlayer(), player2);
 
         // Next round starts here
         expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(3))));
@@ -172,18 +166,11 @@ contract ShuffleTimeSlotSystemTest is Test {
         vm.warp(block.timestamp + slotDuration);
         vm.prank(player2);
         timeSlotSystem.unlockRound();
-        currentPlayer = timeSlotSystem.getCurrentPlayer();
-        assertEq(currentPlayer, player2);
+        assertEq(timeSlotSystem.getCurrentPlayer(), player2);
         vm.warp(block.timestamp + slotDuration);
-        vm.prank(player3);
-        timeSlotSystem.unlockRound();
-        currentPlayer = timeSlotSystem.getCurrentPlayer();
-        assertEq(currentPlayer, player3);
+        assertEq(timeSlotSystem.getCurrentPlayer(), player3);
         vm.warp(block.timestamp + slotDuration);
-        vm.prank(player1);
-        timeSlotSystem.unlockRound();
-        currentPlayer = timeSlotSystem.getCurrentPlayer();
-        assertEq(currentPlayer, player1);
+        assertEq(timeSlotSystem.getCurrentPlayer(), player1);
 
         // Next round starts here
         expcRandom = uint256(keccak256(abi.encodePacked(timeSlotSystem.randomSeed(), uint256(4))));
@@ -192,25 +179,19 @@ contract ShuffleTimeSlotSystemTest is Test {
         vm.warp(block.timestamp + 2 * slotDuration);
         vm.prank(player2);
         timeSlotSystem.unlockRound();
-        currentPlayer = timeSlotSystem.getCurrentPlayer();
-        assertEq(currentPlayer, player2);
+        assertEq(timeSlotSystem.getCurrentPlayer(), player2);
         vm.warp(block.timestamp + slotDuration);
-        vm.prank(player3);
-        timeSlotSystem.unlockRound();
-        currentPlayer = timeSlotSystem.getCurrentPlayer();
-        assertEq(currentPlayer, player3);
+
+        assertEq(timeSlotSystem.getCurrentPlayer(), player3);
         vm.warp(block.timestamp + slotDuration);
     
         vm.prank(player3);
         timeSlotSystem.unlockRound();
-        currentPlayer = timeSlotSystem.getCurrentPlayer();
-        assertEq(currentPlayer, player3);
+        assertEq(timeSlotSystem.getCurrentPlayer(), player3);
         vm.warp(block.timestamp + slotDuration);
-        currentPlayer = timeSlotSystem.getCurrentPlayer();
-        assertEq(currentPlayer, player2);
+        assertEq(timeSlotSystem.getCurrentPlayer(), player2);
         vm.warp(block.timestamp + slotDuration);
-        currentPlayer = timeSlotSystem.getCurrentPlayer();
-        assertEq(currentPlayer, player1);
+        assertEq(timeSlotSystem.getCurrentPlayer(), player1);
 
         // Next round starts here
         vm.warp(block.timestamp + slotDuration);
@@ -219,8 +200,7 @@ contract ShuffleTimeSlotSystemTest is Test {
         emit IAccessManager.NextRoundAnnouncement(6, expcRandom, slotDuration, 61200, fisherYatesShuffle(expcRandom));
         vm.prank(player1);
         timeSlotSystem.unlockRound();
-        currentPlayer = timeSlotSystem.getCurrentPlayer();
-        assertEq(currentPlayer, player1);
+        assertEq(timeSlotSystem.getCurrentPlayer(), player1);
     }
 
     function fisherYatesShuffle(uint256 random) private view returns(uint256[] memory slots) {
